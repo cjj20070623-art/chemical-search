@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChemLab · 化学用品查询系统</title>
+<style>
+:root{
+  --bg:#070b14;
+  --panel:rgba(16,24,42,.72);
+  --panel-solid:#101a2e;
+  --border:rgba(120,180,255,.14);
+  --accent:#34e0c8;
+  --accent2:#7c5cff;
+  --pink:#ff6b9d;
+  --danger:#ff5470;
+  --warning:#ffb347;
+  --safe:#3ddc84;
+  --text:#e8f0ff;
+  --text-dim:#8fa3c8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  background-image:
+    radial-gradient(circle at 15% 20%,rgba(52,224,200,.07),transparent 42%),
+    radial-gradient(circle at 85% 75%,rgba(124,92,255,.08),transparent 42%),
+    linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:auto,auto,44px 44px,44px 44px;
+  overflow-x:hidden;
+}
+#molecule-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+.container{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:28px 22px 80px}
+
+/* ---------- 顶部导航 ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:36px}
+.logo{display:flex;align-items:center;gap:12px}
+.logo svg{width:38px;height:38px;filter:drop-shadow(0 0 10px rgba(52,224,200,.6))}
+.logo-name{font-size:20px;font-weight:800;letter-spacing:1px}
+.logo-name em{font-style:normal;color:var(--accent)}
+.logo-sub{font-size:11px;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase}
+.top-badge{
+  font-size:12px;color:var(--text-dim);border:1px solid var(--border);
+  padding:7px 16px;border-radius:99px;background:var(--panel);backdrop-filter:blur(8px);
+  display:flex;align-items:center;gap:8px;
+}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--safe);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(61,220,132,.5)}50%{box-shadow:0 0 0 7px rgba(61,220,132,0)}}
+
+/* ---------- Hero ---------- */
+.hero{text-align:center;padding:38px 0 30px}
+.hero-tag{
+  display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:4px;
+  color:var(--accent);border:1px solid rgba(52,224,200,.35);padding:6px 18px;
+  border-radius:99px;margin-bottom:22px;background:rgba(52,224,200,.06);
+  animation:fadeDown .8s ease both;
+}
+.hero h1{
+  font-size:clamp(34px,5.5vw,58px);font-weight:900;line-height:1.18;letter-spacing:2px;
+  background:linear-gradient(120deg,#fff 20%,var(--accent) 50%,var(--accent2) 85%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 26px rgba(52,224,200,.25));
+  animation:fadeDown .8s .12s ease both;
+}
+.hero p{color:var(--text-dim);margin-top:14px;font-size:15px;animation:fadeDown .8s .24s ease both}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:none}}
+
+/* ---------- 搜索 ---------- */
+.search-wrap{max-width:640px;margin:30px auto 0;position:relative;animation:fadeDown .8s .36s ease both}
+.search-box{
+  display:flex;align-items:center;gap:12px;background:var(--panel);
+  border:1px solid var(--border);border-radius:18px;padding:6px 10px 6px 22px;
+  backdrop-filter:blur(14px);transition:.3s;
+}
+.search-box:focus-within{
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(52,224,200,.12),0 0 34px rgba(52,224,200,.22);
+}
+.search-box svg{flex:none;width:20px;height:20px;stroke:var(--accent)}
+#search-input{
+  flex:1;background:none;border:none;outline:none;color:var(--text);
+  font-size:16px;padding:14px 0;min-width:0;
+}
+#search-input::placeholder{color:var(--text-dim)}
+#clear-btn{
+  display:none;border:none;background:rgba(255,255,255,.08);color:var(--text-dim);
+  width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px;flex:none;
+}
+#clear-btn:hover{background:rgba(255,84,112,.25);color:#fff}
+.search-hint{margin-top:12px;font-size:12px;color:var(--text-dim)}
+.search-hint code{color:var(--accent);background:rgba(52,224,200,.08);padding:1px 8px;border-radius:6px;font-family:inherit}
+
+/* ---------- 统计 ---------- */
+.stats{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:26px;animation:fadeDown .8s .48s ease both}
+.stat-chip{
+  display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;padding:10px 20px;backdrop-filter:blur(10px);
+}
+.stat-chip .num{font-size:22px;font-weight:800;color:var(--accent)}
+.stat-chip .lbl{font-size:12px;color:var(--text-dim)}
+
+/* ---------- 筛选区 ---------- */
+.filter-panel{
+  margin-top:38px;background:var(--panel);border:1px solid var(--border);
+  border-radius:20px;padding:20px 24px;backdrop-filter:blur(14px);
+}
+.filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 0}
+.filter-row + .filter-row{border-top:1px dashed rgba(255,255,255,.07)}
+.filter-label{
+  flex:none;font-size:12px;color:var(--text-dim);letter-spacing:2px;width:64px;
+  display:flex;align-items:center;gap:6px;
+}
+.chip{
+  border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text-dim);
+  padding:7px 15px;border-radius:99px;font-size:13px;cursor:pointer;transition:.22s;
+  display:inline-flex;align-items:center;gap:6px;user-select:none;
+}
+.chip:hover{border-color:rgba(52,224,200,.5);color:var(--text);transform:translateY(-1px)}
+.chip.active{
+  background:linear-gradient(120deg,rgba(52,224,200,.18),rgba(124,92,255,.18));
+  border-color:var(--accent);color:#fff;box-shadow:0 0 16px rgba(52,224,200,.25);
+}
+.chip.hazard-chip.active{border-color:var(--hc,#ff5470);box-shadow:0 0 16px color-mix(in srgb,var(--hc,#ff5470) 35%,transparent)}
+.filter-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+#sort-select{
+  background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);
+  border-radius:10px;padding:8px 12px;font-size:13px;outline:none;cursor:pointer;
+}
+#sort-select option{background:var(--panel-solid)}
+#fav-toggle.active{background:rgba(255,214,90,.15);border-color:#ffd65a;color:#ffd65a;box-shadow:0 0 16px rgba(255,214,90,.25)}
+.result-count{margin-top:14px;font-size:13px;color:var(--text-dim);text-align:right}
+.result-count b{color:var(--accent)}
+
+/* ---------- 卡片网格 ---------- */
+.grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
+  gap:18px;margin-top:22px;
+}
+.card{
+  position:relative;background:var(--panel);border:1px solid var(--border);
+  border-radius:18px;padding:20px;cursor:pointer;backdrop-filter:blur(10px);
+  transition:transform .28s,box-shadow .28s,border-color .28s;
+  animation:cardIn .5s ease both;overflow:hidden;
+}
+.card::before{
+  content:"";position:absolute;inset:0;border-radius:18px;opacity:0;transition:.3s;
+  background:radial-gradient(420px circle at var(--mx,50%) var(--my,0%),rgba(52,224,200,.1),transparent 65%);
+  pointer-events:none;
+}
+.card:hover{transform:translateY(-5px);border-color:rgba(52,224,200,.45);box-shadow:0 14px 44px rgba(0,0,0,.45),0 0 24px rgba(52,224,200,.12)}
+.card:hover::before{opacity:1}
+@keyframes cardIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.card-top{display:flex;align-items:flex-start;gap:10px}
+.cat-icon{
+  flex:none;width:42px;height:42px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:20px;border:1px solid;
+}
+.card-name{flex:1;min-width:0}
+.card-name h3{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-name .en{font-size:12px;color:var(--text-dim);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fav-btn{
+  flex:none;border:none;background:none;font-size:19px;cursor:pointer;color:#5a6b8c;
+  transition:.2s;line-height:1;padding:2px;
+}
+.fav-btn:hover{transform:scale(1.25)}
+.fav-btn.on{color:#ffd65a;text-shadow:0 0 12px rgba(255,214,90,.7)}
+.card-formula{
+  margin-top:12px;font-size:20px;font-weight:700;color:var(--accent);
+  font-family:"Cambria Math",Georgia,serif;letter-spacing:1px;
+}
+.card-cas{font-size:12px;color:var(--text-dim);margin-top:4px}
+.card-cas b{color:#b9c8e8;font-weight:600}
+.card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;min-height:24px}
+.hazard-tag{
+  font-size:11px;padding:3px 10px;border-radius:99px;border:1px solid;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.tag-more{font-size:11px;color:var(--text-dim);align-self:center}
+.risk-pill{
+  position:absolute;top:0;right:0;font-size:11px;font-weight:700;padding:5px 14px;
+  border-radius:0 18px 0 14px;letter-spacing:1px;
+}
+.risk-high{background:rgba(255,84,112,.16);color:var(--danger);border-left:1px solid rgba(255,84,112,.4);border-bottom:1px solid rgba(255,84,112,.4)}
+.risk-mid{background:rgba(255,179,71,.14);color:var(--warning);border-left:1px solid rgba(255,179,71,.4);border-bottom:1px solid rgba(255,179,71,.4)}
+.risk-low{background:rgba(61,220,132,.12);color:var(--safe);border-left:1px solid rgba(61,220,132,.35);border-bottom:1px solid rgba(61,220,132,.35)}
+
+/* ---------- 空态 ---------- */
+.empty{display:none;text-align:center;padding:80px 0;color:var(--text-dim)}
+.empty svg{width:90px;height:90px;margin-bottom:18px;opacity:.55}
+.empty p{font-size:16px}
+
+/* ---------- 详情弹窗 ---------- */
+.modal-mask{
+  position:fixed;inset:0;background:rgba(4,8,16,.7);backdrop-filter:blur(8px);
+  z-index:50;display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal-mask.show{display:flex;animation:maskIn .25s ease}
+@keyframes maskIn{from{opacity:0}to{opacity:1}}
+.modal{
+  width:min(720px,100%);max-height:88vh;overflow-y:auto;background:var(--panel-solid);
+  border:1px solid rgba(52,224,200,.3);border-radius:22px;padding:30px;
+  box-shadow:0 30px 90px rgba(0,0,0,.6),0 0 50px rgba(52,224,200,.1);
+  animation:modalIn .3s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes modalIn{from{opacity:0;transform:translateY(30px) scale(.96)}to{opacity:1;transform:none}}
+.modal::-webkit-scrollbar{width:8px}
+.modal::-webkit-scrollbar-thumb{background:rgba(120,180,255,.2);border-radius:8px}
+.modal-head{display:flex;align-items:flex-start;gap:14px}
+.modal-head .cat-icon{width:52px;height:52px;font-size:26px;border-radius:14px}
+.modal-title{flex:1;min-width:0}
+.modal-title h2{font-size:25px;font-weight:800}
+.modal-title .en{color:var(--text-dim);font-style:italic;font-size:14px;margin-top:2px}
+.modal-close{
+  border:none;background:rgba(255,255,255,.07);color:var(--text-dim);width:34px;height:34px;
+  border-radius:50%;cursor:pointer;font-size:16px;flex:none;
+}
+.modal-close:hover{background:rgba(255,84,112,.25);color:#fff}
+.modal-formula{
+  margin:18px 0 4px;font-size:34px;font-weight:800;color:var(--accent);
+  font-family:"Cambria Math",Georgia,serif;text-align:center;letter-spacing:2px;
+  text-shadow:0 0 22px rgba(52,224,200,.4);
+}
+.modal-alias{text-align:center;font-size:12px;color:var(--text-dim);margin-bottom:6px}
+.info-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:10px;margin-top:18px;
+}
+.info-item{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:11px 14px}
+.info-item .k{font-size:11px;color:var(--text-dim);letter-spacing:1px}
+.info-item .v{font-size:14px;font-weight:600;margin-top:4px}
+.section-title{
+  display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;
+  margin:24px 0 12px;color:var(--accent);letter-spacing:2px;
+}
+.section-title::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(52,224,200,.4),transparent)}
+.signal-word{
+  display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:14px;
+  padding:6px 16px;border-radius:10px;letter-spacing:2px;
+}
+.signal-danger{background:rgba(255,84,112,.15);color:var(--danger);border:1px solid rgba(255,84,112,.45)}
+.signal-warning{background:rgba(255,179,71,.13);color:var(--warning);border:1px solid rgba(255,179,71,.45)}
+.signal-safe{background:rgba(61,220,132,.12);color:var(--safe);border:1px solid rgba(61,220,132,.4)}
+.ghs-row{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px}
+.ghs-item{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11px;color:var(--text-dim)}
+.ghs-diamond{
+  width:46px;height:46px;border:3px solid #e8412e;background:#fff;border-radius:8px;
+  transform:rotate(45deg);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(232,65,46,.3);
+}
+.ghs-diamond span{transform:rotate(-45deg);font-size:21px}
+.desc-box{
+  background:rgba(255,255,255,.04);border-left:3px solid var(--accent);
+  border-radius:0 12px 12px 0;padding:13px 16px;font-size:13.5px;line-height:1.75;color:#c6d4ef;
+}
+.desc-box.safety{border-left-color:var(--warning)}
+/* ---------- 在线查询 ---------- */
+.src-row{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap;animation:fadeDown .8s .42s ease both}
+#online-toggle.active{background:rgba(124,92,255,.18);border-color:var(--accent2);color:#fff;box-shadow:0 0 16px rgba(124,92,255,.3)}
+.online-section{display:none;margin-top:26px}
+.online-head{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:var(--accent2);letter-spacing:1px;margin-bottom:14px}
+.online-head::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(124,92,255,.4),transparent)}
+.online-badge{font-size:11px;color:var(--text-dim);font-weight:400}
+.online-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.online-card{
+  background:var(--panel);border:1px solid rgba(124,92,255,.22);border-radius:16px;
+  padding:16px;cursor:pointer;text-align:center;transition:.25s;backdrop-filter:blur(10px);
+  animation:cardIn .5s ease both;
+}
+.online-card:hover{transform:translateY(-4px);border-color:var(--accent2);box-shadow:0 10px 30px rgba(0,0,0,.4),0 0 20px rgba(124,92,255,.18)}
+.mol-img{width:110px;height:110px;object-fit:contain;background:#fff;border-radius:12px;padding:6px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.3))}
+.online-card h4{margin-top:10px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.online-card .f{font-size:14px;color:var(--accent);font-family:"Cambria Math",Georgia,serif;margin-top:3px}
+.online-card .cid{font-size:11px;color:var(--text-dim);margin-top:4px}
+.spinner{width:24px;height:24px;border:3px solid rgba(124,92,255,.25);border-top-color:var(--accent2);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.online-loading{display:flex;align-items:center;gap:12px;color:var(--text-dim);font-size:13px;padding:10px 2px}
+.online-tip{font-size:12.5px;color:var(--text-dim);padding:8px 2px;line-height:1.7}
+.online-tip code{color:var(--accent2);background:rgba(124,92,255,.12);padding:1px 8px;border-radius:6px}
+.modal-mol{display:block;margin:14px auto 0;width:210px;height:210px;object-fit:contain;background:#fff;border-radius:16px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.pubchem-link{display:inline-flex;align-items:center;gap:6px;margin-top:18px;font-size:12.5px;color:var(--accent2);text-decoration:none;border:1px solid rgba(124,92,255,.4);padding:7px 16px;border-radius:99px;transition:.2s}
+.pubchem-link:hover{background:rgba(124,92,255,.15)}
+.h-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:14px}
+.h-table td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.06);color:#c6d4ef;vertical-align:top}
+.h-table td:first-child{color:var(--warning);font-weight:700;white-space:nowrap}
+/* ---------- 爬虫查询 ---------- */
+#crawler-toggle.active{background:rgba(52,224,200,.16);border-color:var(--accent);color:#fff;box-shadow:0 0 16px rgba(52,224,200,.3)}
+.crawler-status{margin-top:10px;font-size:12px;color:var(--text-dim);display:none;align-items:center;justify-content:center;gap:7px}
+.crawler-status.show{display:flex}
+.status-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.status-dot.on{background:var(--safe);box-shadow:0 0 8px rgba(61,220,132,.7)}
+.status-dot.off{background:var(--danger);box-shadow:0 0 8px rgba(255,84,112,.7)}
+.crawler-head{color:var(--accent)}
+.crawler-head::after{background:linear-gradient(90deg,rgba(52,224,200,.4),transparent)}
+.crawler-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.crawler-card{
+  position:relative;background:var(--panel);border:1px solid rgba(52,224,200,.22);border-radius:16px;
+  padding:16px 18px;cursor:pointer;transition:.25s;backdrop-filter:blur(10px);
+  animation:cardIn .5s ease both;overflow:hidden;
+}
+.crawler-card:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 10px 30px rgba(0,0,0,.4),0 0 20px rgba(52,224,200,.18)}
+.crawler-card .cc-top{display:flex;align-items:center;gap:10px}
+.crawler-card .cc-icon{flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--accent);border:1px solid rgba(52,224,200,.35);background:rgba(52,224,200,.08)}
+.crawler-card h4{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.crawler-card .cc-cas{font-size:12px;color:var(--text-dim);margin-top:9px}
+.crawler-card .cc-cas b{color:#b9c8e8}
+.crawler-card .cc-cb{
+  position:absolute;top:0;right:0;font-size:10px;color:var(--accent);padding:4px 10px;
+  border-left:1px solid rgba(52,224,200,.3);border-bottom:1px solid rgba(52,224,200,.3);
+  border-radius:0 16px 0 10px;background:rgba(52,224,200,.08);
+}
+.crawler-card .cc-tip{font-size:11px;color:var(--text-dim);margin-top:9px}
+.sym-tag{
+  display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 12px;
+  border-radius:9px;border:1px solid rgba(255,84,112,.45);background:rgba(255,84,112,.12);color:var(--danger);
+}
+.src-link{display:inline-flex;align-items:center;gap:6px;margin-top:18px;font-size:12.5px;color:var(--accent);text-decoration:none;border:1px solid rgba(52,224,200,.4);padding:7px 16px;border-radius:99px;transition:.2s}
+.src-link:hover{background:rgba(52,224,200,.12)}
+/* ---------- 爬虫详情增强 ---------- */
+.alias-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
+.alias-chip{font-size:11.5px;color:#b9c8e8;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:4px 11px;border-radius:99px}
+.hazmat-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--danger);background:rgba(255,84,112,.12);border:1px solid rgba(255,84,112,.45);padding:5px 13px;border-radius:9px}
+.phrase-list{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.phrase-item{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.6;color:#c6d4ef;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:8px 12px}
+.phrase-code{flex:none;font-weight:800;font-family:Consolas,monospace;font-size:11.5px;color:var(--danger);background:rgba(255,84,112,.1);border:1px solid rgba(255,84,112,.3);border-radius:7px;padding:2px 8px}
+.phrase-item.s .phrase-code{color:var(--safe);background:rgba(61,220,132,.08);border-color:rgba(61,220,132,.3)}
+.sec-block{margin-top:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:13px 16px}
+.sec-block h5{font-size:13px;color:var(--accent);margin-bottom:7px;font-weight:700}
+.sec-block p{font-size:12.8px;line-height:1.8;color:#c6d4ef}
+.en-alias{text-align:center;font-size:11.5px;color:var(--text-dim);margin-top:8px;line-height:1.6}
+/* ---------- Chemie 讲解小精灵 ---------- */
+#buddy-wrap{position:fixed;right:26px;bottom:26px;z-index:900;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+#buddy{width:86px;height:100px;cursor:grab;touch-action:none;user-select:none;filter:drop-shadow(0 8px 20px rgba(52,224,200,.35));animation:buddy-float 3.2s ease-in-out infinite;transition:transform .25s}
+#buddy:hover{transform:scale(1.08)}
+#buddy.dragging{cursor:grabbing;animation-play-state:paused;transform:scale(1.06)}
+@keyframes buddy-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+#buddy .b-eyes{transform-origin:center;animation:buddy-blink 4.5s infinite}
+@keyframes buddy-blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.08)}}
+#buddy .b-bubble{animation:bubble-rise 2.6s ease-in infinite;opacity:0}
+#buddy .b-bubble.b2{animation-delay:1.3s}
+@keyframes bubble-rise{0%{transform:translateY(0);opacity:0}20%{opacity:.9}80%{opacity:.7}100%{transform:translateY(-22px);opacity:0}}
+#buddy-tip{position:fixed;z-index:901;max-width:220px;background:linear-gradient(135deg,#1c2b45,#14203a);border:1px solid rgba(52,224,200,.4);color:#d9e6ff;font-size:12.5px;line-height:1.6;padding:10px 14px;border-radius:14px 14px 4px 14px;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transform:translateY(6px);transition:.35s;pointer-events:none}
+#buddy-tip.show{opacity:1;transform:translateY(0)}
+#buddy-panel{position:fixed;z-index:901;width:340px;max-width:calc(100vw - 40px);height:460px;max-height:calc(100vh - 20px);background:linear-gradient(180deg,#141f36,#0e1628);border:1px solid rgba(52,224,200,.3);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.55);display:none;flex-direction:column;overflow:hidden}
+#buddy-panel.open{display:flex;animation:panel-pop .3s cubic-bezier(.2,1.4,.4,1)}
+@keyframes panel-pop{from{opacity:0;transform:translateY(16px) scale(.94)}to{opacity:1;transform:none}}
+.bp-head{display:flex;align-items:center;gap:9px;padding:13px 16px;background:rgba(52,224,200,.08);border-bottom:1px solid rgba(52,224,200,.18);font-weight:800;font-size:14px;color:#eaf2ff}
+.bp-head .bp-dot{width:8px;height:8px;border-radius:50%;background:var(--safe);box-shadow:0 0 8px var(--safe)}
+.bp-head .bp-sub{font-size:10.5px;font-weight:400;color:var(--text-dim);margin-left:auto}
+.bp-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.bp-msg{max-width:84%;padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;animation:msg-in .3s}
+@keyframes msg-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.bp-msg.ai{align-self:flex-start;background:rgba(52,224,200,.1);border:1px solid rgba(52,224,200,.22);color:#d9e6ff;border-bottom-left-radius:4px}
+.bp-msg.me{align-self:flex-end;background:linear-gradient(135deg,#34e0c8,#1dd1a1);color:#04252b;font-weight:600;border-bottom-right-radius:4px}
+.bp-msg.typing{display:flex;gap:5px;padding:13px 16px}
+.bp-msg.typing i{width:7px;height:7px;border-radius:50%;background:#34e0c8;animation:tp .9s infinite}
+.bp-msg.typing i:nth-child(2){animation-delay:.15s}.bp-msg.typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+.bp-chips{display:flex;gap:7px;padding:0 12px 8px;flex-wrap:wrap}
+.bp-chip{font-size:11px;color:var(--accent);background:rgba(52,224,200,.07);border:1px solid rgba(52,224,200,.3);padding:5px 11px;border-radius:99px;cursor:pointer;transition:.2s}
+.bp-chip:hover{background:rgba(52,224,200,.16)}
+.bp-input{display:flex;gap:8px;padding:11px 12px;border-top:1px solid rgba(255,255,255,.07)}
+.bp-input input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 13px;color:#eaf2ff;font-size:13px;outline:none}
+.bp-input input:focus{border-color:rgba(52,224,200,.5)}
+.bp-input button{background:linear-gradient(135deg,#34e0c8,#1dd1a1);border:none;color:#04252b;font-weight:800;font-size:13px;padding:0 17px;border-radius:12px;cursor:pointer;transition:.2s}
+.bp-input button:hover{filter:brightness(1.1)}
+.bp-input button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:600px){
+  .filter-label{width:100%}
+  .filter-right{margin-left:0}
+  .modal{padding:22px}
+}
+</style>
+</head>
+<body>
+<canvas id="molecule-canvas"></canvas>
+
+<div class="container">
+  <!-- 顶部 -->
+  <div class="topbar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#34e0c8" stroke-width="1.6">
+        <path d="M9 3h6M10 3v6.3L4.5 19a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.3V3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M7.5 15h9" stroke-linecap="round"/>
+        <circle cx="12" cy="18" r=".6" fill="#34e0c8"/><circle cx="10.5" cy="16.8" r=".5" fill="#34e0c8"/><circle cx="13.5" cy="16.5" r=".5" fill="#34e0c8"/>
+      </svg>
+      <div>
+        <div class="logo-name">Chem<em>Lab</em> 化学用品查询</div>
+        <div class="logo-sub">Chemical Reagent Database</div>
+      </div>
+    </div>
+    <div class="top-badge"><span class="pulse-dot"></span>本地库 + PubChem + 爬虫 三引擎</div>
+  </div>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-tag">⚗ LABORATORY REAGENT QUERY</div>
+    <h1>探索化学世界<br>从每一种试剂开始</h1>
+    <p>本地内置 54 种常用试剂 · 在线直连 PubChem 1.1 亿+ 化合物 · 支持中文 / 英文名 / CAS 号 / 分子式检索</p>
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg>
+        <input id="search-input" type="text" placeholder="搜索化学品，如：乙醇 / 7647-01-0 / H2SO4 / 小苏打…" autocomplete="off">
+        <button id="clear-btn" title="清空">✕</button>
+      </div>
+      <div class="search-hint">试试搜索 <code>双氧水</code> <code>烧碱</code> <code>67-56-1</code> <code>aspirin</code></div>
+      <div class="src-row">
+        <button class="chip active" id="online-toggle">🌐 PubChem 在线查询</button>
+        <button class="chip active" id="crawler-toggle">🕷️ 爬虫实时查询</button>
+        <span style="font-size:12px;color:var(--text-dim)">PubChem 1.1 亿+ 化合物 · 爬虫抓取 ChemicalBook 中文数据</span>
+      </div>
+      <div class="crawler-status" id="crawler-status"></div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <!-- 筛选 -->
+  <section class="filter-panel">
+    <div class="filter-row">
+      <div class="filter-label">🧫 分类</div>
+      <div id="cat-chips" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-label">⚠ 危险</div>
+      <div id="hazard-chips" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+      <div class="filter-right">
+        <select id="sort-select">
+          <option value="default">默认排序</option>
+          <option value="mw-asc">分子量 ↑</option>
+          <option value="mw-desc">分子量 ↓</option>
+          <option value="name">名称 A-Z</option>
+        </select>
+        <button class="chip" id="fav-toggle">⭐ 只看收藏</button>
+      </div>
+    </div>
+    <div class="result-count" id="result-count"></div>
+  </section>
+
+  <!-- PubChem 在线结果 -->
+  <section class="online-section" id="online-section">
+    <div class="online-head">🌐 PubChem 在线结果 <span class="online-badge" id="online-badge"></span></div>
+    <div id="online-body"></div>
+  </section>
+
+  <!-- 爬虫实时结果 -->
+  <section class="online-section" id="crawler-section">
+    <div class="online-head crawler-head">🕷️ 爬虫实时结果 <span class="online-badge" id="crawler-badge"></span></div>
+    <div id="crawler-body"></div>
+  </section>
+
+  <!-- 卡片 -->
+  <main class="grid" id="grid"></main>
+
+  <!-- 空态 -->
+  <div class="empty" id="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#8fa3c8" stroke-width="1.2">
+      <path d="M9 3h6M10 3v6.3L4.5 19a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.3V3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M8 12h8" stroke-dasharray="2 2"/>
+    </svg>
+    <p>未找到匹配的化学品</p>
+    <p style="font-size:13px;margin-top:8px">换个关键词，或调整筛选条件试试</p>
+  </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div class="modal-mask" id="modal-mask">
+  <div class="modal" id="modal"></div>
+</div>
+
+<!-- Chemie 讲解小精灵 -->
+<div id="buddy-wrap">
+  <div id="buddy-tip"></div>
+  <div id="buddy-panel">
+    <div class="bp-head">
+      <span class="bp-dot"></span>Chemie 化学小精灵
+      <span class="bp-sub">DeepSeek 驱动</span>
+    </div>
+    <div class="bp-msgs" id="bp-msgs"></div>
+    <div class="bp-chips" id="bp-chips"></div>
+    <div class="bp-input">
+      <input id="bp-text" placeholder="问我化学问题吧～" maxlength="300" autocomplete="off">
+      <button id="bp-send">发送</button>
+    </div>
+  </div>
+  <svg id="buddy" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg">
+    <!-- 软木塞 -->
+    <rect x="40" y="2" width="20" height="12" rx="3" fill="#c98f5a"/>
+    <rect x="40" y="8" width="20" height="3" rx="1.5" fill="#a56f3e"/>
+    <!-- 瓶颈 -->
+    <path d="M42 12 h16 v22 h-16 z" fill="rgba(190,225,255,.28)" stroke="#8fd8e8" stroke-width="2"/>
+    <!-- 圆底瓶身 -->
+    <path d="M42 34 C20 44 8 62 8 78 a42 34 0 0 0 84 0 c0 -16 -12 -34 -34 -44 z"
+          fill="rgba(190,225,255,.16)" stroke="#8fd8e8" stroke-width="2.5"/>
+    <!-- 液体 -->
+    <path d="M14 66 q12 -7 24 0 t24 0 t24 0 a40 28 0 0 1 -72 0 z" fill="url(#liq)"/>
+    <defs>
+      <linearGradient id="liq" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3ee6c9" stop-opacity=".95"/>
+        <stop offset="1" stop-color="#17a589" stop-opacity=".95"/>
+      </linearGradient>
+    </defs>
+    <!-- 液面气泡 -->
+    <circle class="b-bubble" cx="38" cy="72" r="3.2" fill="rgba(255,255,255,.85)"/>
+    <circle class="b-bubble b2" cx="60" cy="76" r="2.4" fill="rgba(255,255,255,.8)"/>
+    <!-- 眼睛(液体上) -->
+    <g class="b-eyes">
+      <circle cx="37" cy="62" r="6.5" fill="#fff"/>
+      <circle cx="63" cy="62" r="6.5" fill="#fff"/>
+      <circle cx="38.5" cy="63" r="3.4" fill="#17223b"/>
+      <circle cx="64.5" cy="63" r="3.4" fill="#17223b"/>
+      <circle cx="40" cy="61.5" r="1.2" fill="#fff"/>
+      <circle cx="66" cy="61.5" r="1.2" fill="#fff"/>
+    </g>
+    <!-- 腮红 -->
+    <ellipse cx="26" cy="72" rx="4.5" ry="2.6" fill="#ff9fb2" opacity=".8"/>
+    <ellipse cx="74" cy="72" rx="4.5" ry="2.6" fill="#ff9fb2" opacity=".8"/>
+    <!-- 微笑 -->
+    <path d="M44 73 q6 5 12 0" stroke="#17223b" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <!-- 小手 -->
+    <ellipse cx="7" cy="76" rx="5" ry="7" fill="rgba(190,225,255,.3)" stroke="#8fd8e8" stroke-width="2"/>
+    <ellipse cx="93" cy="76" rx="5" ry="7" fill="rgba(190,225,255,.3)" stroke="#8fd8e8" stroke-width="2"/>
+  </svg>
+</div>
+
+<script>
+/* ================= 数据字典 ================= */
+const CATEGORIES = {
+  acid:   {label:'酸类',     icon:'🧪', color:'#ff6b81'},
+  base:   {label:'碱类',     icon:'⚗️', color:'#48dbfb'},
+  solvent:{label:'有机溶剂', icon:'💧', color:'#1dd1a1'},
+  salt:   {label:'无机盐',   icon:'🧂', color:'#feca57'},
+  oxide:  {label:'氧化剂',   icon:'⚡', color:'#ff9f43'},
+  metal:  {label:'金属单质', icon:'🔩', color:'#c8d6e5'},
+  gas:    {label:'气体',     icon:'💨', color:'#a29bfe'},
+  organic:{label:'有机物',   icon:'🧬', color:'#ff9ff3'},
+  other:  {label:'其他试剂', icon:'🧫', color:'#95afc0'}
+};
+const HAZARDS = {
+  flammable:    {label:'易燃',     icon:'🔥', color:'#ff9f43'},
+  corrosive:    {label:'腐蚀性',   icon:'🧪', color:'#ff6b81'},
+  toxic:        {label:'有毒',     icon:'☠️', color:'#b33771'},
+  oxidizer:     {label:'强氧化性', icon:'⚡', color:'#ffd32a'},
+  explosive:    {label:'爆炸性',   icon:'💥', color:'#ff4757'},
+  irritant:     {label:'刺激性',   icon:'❗', color:'#eccc68'},
+  health:       {label:'健康危害', icon:'⚕️', color:'#c56cf0'},
+  environmental:{label:'环境危害', icon:'🐟', color:'#2ed573'},
+  compressed:   {label:'压缩气体', icon:'🎈', color:'#70a1ff'},
+  waterReactive:{label:'遇水反应', icon:'💦', color:'#5352ed'}
+};
+
+/* ================= 化学品数据库 ================= */
+const CHEMICALS = [
+{id:1, name:'盐酸', nameEn:'Hydrochloric Acid', cas:'7647-01-0', formula:'HCl', mw:36.46, cat:'acid', alias:['氢氯酸'], appearance:'无色有刺激性气味的液体，易挥发', mp:'-35 °C(浓)', bp:'57 °C(恒沸)', density:'1.18 g/cm³(37%)', hazards:['corrosive','irritant'], uses:'金属酸洗、实验室酸化、pH 调节、食品工业', safety:'佩戴耐酸手套与护目镜，通风橱中操作；皮肤接触立即用大量清水冲洗'},
+{id:2, name:'硫酸', nameEn:'Sulfuric Acid', cas:'7664-93-9', formula:'H2SO4', mw:98.08, cat:'acid', alias:['磺镪水'], appearance:'无色透明油状黏稠液体', mp:'10.4 °C', bp:'337 °C', density:'1.84 g/cm³', hazards:['corrosive','oxidizer'], uses:'化肥生产、铅酸蓄电池、脱水剂、化工原料', safety:'稀释时必须将酸沿器壁缓慢注入水中并搅拌，严禁将水倒入酸中'},
+{id:3, name:'硝酸', nameEn:'Nitric Acid', cas:'7697-37-2', formula:'HNO3', mw:63.01, cat:'acid', alias:['硝镪水'], appearance:'无色液体，见光易分解产生红棕色 NO2', mp:'-42 °C', bp:'83 °C', density:'1.51 g/cm³(68%)', hazards:['corrosive','oxidizer','toxic'], uses:'化肥、炸药、染料中间体、金属蚀刻', safety:'棕色瓶避光保存；与有机物接触可能起火，蒸气有毒需通风'},
+{id:4, name:'冰醋酸', nameEn:'Acetic Acid', cas:'64-19-7', formula:'CH3COOH', mw:60.05, cat:'acid', alias:['乙酸','冰乙酸'], appearance:'无色刺激性液体，低温结冰状', mp:'16.6 °C', bp:'118 °C', density:'1.05 g/cm³', hazards:['corrosive','flammable'], uses:'合成醋酸纤维、医药、食品酸味剂(稀释后)', safety:'蒸气易燃，远离明火；浓溶液对皮肤有强刺激性'},
+{id:5, name:'磷酸', nameEn:'Phosphoric Acid', cas:'7664-38-2', formula:'H3PO4', mw:98.00, cat:'acid', alias:['正磷酸'], appearance:'无色透明黏稠液体或晶体', mp:'42.4 °C', bp:'261 °C(分解)', density:'1.87 g/cm³(85%)', hazards:['corrosive','irritant'], uses:'磷肥、食品级酸味剂(可乐)、金属磷化处理', safety:'常规防酸措施；眼睛接触用流水冲洗 15 分钟'},
+{id:6, name:'氢氟酸', nameEn:'Hydrofluoric Acid', cas:'7664-39-3', formula:'HF', mw:20.01, cat:'acid', alias:['氟化氢溶液'], appearance:'无色透明发烟液体', mp:'-83 °C', bp:'19.5 °C', density:'1.15 g/cm³(40%)', hazards:['toxic','corrosive'], uses:'玻璃蚀刻、半导体清洗、有机氟化物合成', safety:'剧毒！可渗透皮肤侵蚀骨骼，操作时须备葡萄糖酸钙凝胶并全程防护'},
+{id:7, name:'草酸', nameEn:'Oxalic Acid', cas:'144-62-7', formula:'H2C2O4', mw:90.03, cat:'acid', alias:['乙二酸'], appearance:'无色单斜片状晶体(常含二分子结晶水)', mp:'101 °C(二水)', bp:'157 °C(升华)', density:'1.65 g/cm³', hazards:['toxic','corrosive'], uses:'除锈漂白、稀土沉淀剂、还原剂、清洗剂', safety:'粉尘有毒，避免吸入；与皮肤伤口接触会引起疼痛'},
+{id:8, name:'硼酸', nameEn:'Boric Acid', cas:'10043-35-3', formula:'H3BO3', mw:61.83, cat:'acid', alias:[], appearance:'白色鳞片状或粉末状晶体', mp:'171 °C', bp:'300 °C(失水)', density:'1.44 g/cm³', hazards:['health','irritant'], uses:'玻璃陶瓷、外用消毒防腐(稀释液)、杀虫、中子吸收', safety:'避免长期大量接触，孕妇慎用；不可内服'},
+{id:9, name:'氢氧化钠', nameEn:'Sodium Hydroxide', cas:'1310-73-2', formula:'NaOH', mw:40.00, cat:'base', alias:['烧碱','火碱','苛性钠'], appearance:'白色片状或颗粒状固体，易潮解', mp:'318 °C', bp:'1390 °C', density:'2.13 g/cm³', hazards:['corrosive'], uses:'肥皂造纸、炼油、实验室中和滴定、疏通管道', safety:'强腐蚀！溶解时放出大量热，须冷水浴降温并缓慢加入'},
+{id:10, name:'氢氧化钾', nameEn:'Potassium Hydroxide', cas:'1310-58-3', formula:'KOH', mw:56.11, cat:'base', alias:['苛性钾'], appearance:'白色块状或棒状固体，极易潮解', mp:'360 °C', bp:'1327 °C', density:'2.12 g/cm³', hazards:['corrosive'], uses:'制钾盐、碱性电池电解液、液体肥皂', safety:'腐蚀性同烧碱，操作戴胶手套与面屏'},
+{id:11, name:'氨水', nameEn:'Ammonia Solution', cas:'1336-21-6', formula:'NH3·H2O', mw:35.05, cat:'base', alias:['阿摩尼亚水'], appearance:'无色透明液体，有强烈刺激性氨臭', mp:'-77 °C', bp:'38 °C(25%)', density:'0.91 g/cm³(25%)', hazards:['corrosive','irritant','environmental'], uses:'化肥、清洁剂、实验室弱碱源、银镜反应', safety:'密封阴凉处保存；挥发气体刺激呼吸道，通风橱中使用'},
+{id:12, name:'氢氧化钙', nameEn:'Calcium Hydroxide', cas:'1305-62-0', formula:'Ca(OH)2', mw:74.09, cat:'base', alias:['熟石灰','消石灰'], appearance:'白色粉末，微溶于水(澄清石灰水)', mp:'580 °C(分解)', bp:'—', density:'2.21 g/cm³', hazards:['corrosive','irritant'], uses:'建筑砂浆、土壤改良、CO2 检验试剂、废水处理', safety:'粉尘刺激呼吸道，操作时佩戴口罩'},
+{id:13, name:'乙醇', nameEn:'Ethanol', cas:'64-17-5', formula:'C2H5OH', mw:46.07, cat:'solvent', alias:['酒精'], appearance:'无色透明液体，有特殊香味', mp:'-114 °C', bp:'78.3 °C', density:'0.789 g/cm³', hazards:['flammable','irritant'], uses:'溶剂、消毒剂(75%)、燃料、有机合成原料', safety:'易燃！远离明火与高温表面，蒸气与空气形成爆炸性混合物'},
+{id:14, name:'甲醇', nameEn:'Methanol', cas:'67-56-1', formula:'CH3OH', mw:32.04, cat:'solvent', alias:['木醇','木精'], appearance:'无色透明液体，气味类似乙醇', mp:'-98 °C', bp:'64.7 °C', density:'0.792 g/cm³', hazards:['flammable','toxic'], uses:'工业溶剂、甲醛生产、燃料添加剂、色谱流动相', safety:'误饮 10mL 可致失明甚至死亡，严禁口尝；使用标识必须与乙醇区分'},
+{id:15, name:'丙酮', nameEn:'Acetone', cas:'67-64-1', formula:'C3H6O', mw:58.08, cat:'solvent', alias:['阿西通'], appearance:'无色易挥发液体，有特殊芳香气味', mp:'-95 °C', bp:'56.1 °C', density:'0.784 g/cm³', hazards:['flammable','irritant'], uses:'万能溶剂、清洗玻璃仪器、指甲油去除剂、有机合成', safety:'极易燃，蒸气比空气重可沿地面扩散，注意通风防静电'},
+{id:16, name:'乙醚', nameEn:'Diethyl Ether', cas:'60-29-7', formula:'C4H10O', mw:74.12, cat:'solvent', alias:['乙氧基乙烷'], appearance:'无色透明易流动液体，有甜味', mp:'-116 °C', bp:'34.5 °C', density:'0.713 g/cm³', hazards:['flammable','explosive','irritant'], uses:'萃取溶剂、曾用作麻醉剂、格氏反应溶剂', safety:'久置生成易爆过氧化物，使用前须检验；沸点极低，严禁明火加热'},
+{id:17, name:'二氯甲烷', nameEn:'Dichloromethane', cas:'75-09-2', formula:'CH2Cl2', mw:84.93, cat:'solvent', alias:['DCM'], appearance:'无色透明液体，有类似醚的气味', mp:'-97 °C', bp:'39.6 °C', density:'1.327 g/cm³', hazards:['toxic','health'], uses:'萃取(咖啡因脱除)、发泡剂、脱漆剂、色谱溶剂', safety:'疑似致癌，蒸气麻醉作用，必须通风橱操作'},
+{id:18, name:'氯仿', nameEn:'Chloroform', cas:'67-66-3', formula:'CHCl3', mw:119.38, cat:'solvent', alias:['三氯甲烷'], appearance:'无色透明重质液体，有甜味', mp:'-64 °C', bp:'61.2 °C', density:'1.489 g/cm³', hazards:['toxic','health'], uses:'有机溶剂、氟利昂原料、曾用作麻醉剂', safety:'光照下分解生成剧毒光气，棕色瓶保存；对肝脏有损害'},
+{id:19, name:'苯', nameEn:'Benzene', cas:'71-43-2', formula:'C6H6', mw:78.11, cat:'solvent', alias:['安息油'], appearance:'无色透明液体，有芳香气味', mp:'5.5 °C', bp:'80.1 °C', density:'0.877 g/cm³', hazards:['flammable','toxic','health'], uses:'化工基础原料(合成塑料、橡胶、染料)，实验室已限制使用', safety:'确认致癌物(白血病)，非必要不使用，可用甲苯替代'},
+{id:20, name:'甲苯', nameEn:'Toluene', cas:'108-88-3', formula:'C7H8', mw:92.14, cat:'solvent', alias:['甲基苯'], appearance:'无色透明液体，有苯样气味', mp:'-95 °C', bp:'110.6 °C', density:'0.867 g/cm³', hazards:['flammable','health','irritant'], uses:'溶剂、TNT 原料、苯甲酸合成、汽油辛烷值提升', safety:'蒸气对神经系统有损害，长期接触需职业防护'},
+{id:21, name:'二甲苯', nameEn:'Xylene', cas:'1330-20-7', formula:'C8H10', mw:106.17, cat:'solvent', alias:['混合二甲苯'], appearance:'无色透明液体，有芳烃气味', mp:'-25 °C(混合)', bp:'138~144 °C', density:'0.86 g/cm³', hazards:['flammable','irritant','health'], uses:'涂料稀释剂、印刷油墨、病理切片透明剂', safety:'刺激皮肤黏膜，避免长期吸入蒸气'},
+{id:22, name:'正己烷', nameEn:'n-Hexane', cas:'110-54-3', formula:'C6H14', mw:86.18, cat:'solvent', alias:['己烷'], appearance:'无色透明液体，有微弱汽油味', mp:'-95 °C', bp:'68.7 °C', density:'0.659 g/cm³', hazards:['flammable','health','environmental'], uses:'植物油萃取、精密仪器清洗、色谱溶剂', safety:'长期接触致周围神经病变，注意岗位通风'},
+{id:23, name:'乙酸乙酯', nameEn:'Ethyl Acetate', cas:'141-78-6', formula:'C4H8O2', mw:88.11, cat:'solvent', alias:['醋酸乙酯'], appearance:'无色透明液体，有水果香味', mp:'-84 °C', bp:'77.1 °C', density:'0.902 g/cm³', hazards:['flammable','irritant'], uses:'萃取溶剂、涂料油墨、食品香精(食品级)', safety:'易燃，对眼鼻有刺激，远离氧化剂存放'},
+{id:24, name:'乙腈', nameEn:'Acetonitrile', cas:'75-05-8', formula:'C2H3N', mw:41.05, cat:'solvent', alias:['甲基氰'], appearance:'无色透明液体，有醚样气味', mp:'-46 °C', bp:'81.6 °C', density:'0.786 g/cm³', hazards:['flammable','toxic'], uses:'HPLC 流动相、有机合成、锂电池电解液', safety:'代谢产物为氰化物，毒性较强，避免皮肤接触'},
+{id:25, name:'四氢呋喃', nameEn:'Tetrahydrofuran', cas:'109-99-9', formula:'C4H8O', mw:72.11, cat:'solvent', alias:['THF','氧杂环戊烷'], appearance:'无色透明液体，有醚样气味', mp:'-108 °C', bp:'66 °C', density:'0.889 g/cm³', hazards:['flammable','explosive','irritant'], uses:'高分子溶剂、格氏反应、PVC 粘合剂', safety:'久置生成爆炸性过氧化物，开封后尽快使用'},
+{id:26, name:'氯化钠', nameEn:'Sodium Chloride', cas:'7647-14-5', formula:'NaCl', mw:58.44, cat:'salt', alias:['食盐'], appearance:'白色立方晶体，味咸', mp:'801 °C', bp:'1413 °C', density:'2.17 g/cm³', hazards:[], uses:'调味品、生理盐水(0.9%)、氯碱工业、融雪剂', safety:'常规实验低危，避免粉尘入眼即可'},
+{id:27, name:'碳酸钠', nameEn:'Sodium Carbonate', cas:'497-19-8', formula:'Na2CO3', mw:105.99, cat:'salt', alias:['纯碱','苏打'], appearance:'白色粉末或颗粒，易吸潮', mp:'851 °C', bp:'1600 °C(分解)', density:'2.53 g/cm³', hazards:['irritant'], uses:'玻璃制造、洗涤剂、软化硬水、酸碱中和', safety:'粉尘有刺激性，避免吸入与入眼'},
+{id:28, name:'碳酸氢钠', nameEn:'Sodium Bicarbonate', cas:'144-55-8', formula:'NaHCO3', mw:84.01, cat:'salt', alias:['小苏打'], appearance:'白色细小晶体或粉末', mp:'270 °C(分解)', bp:'—', density:'2.16 g/cm³', hazards:[], uses:'发酵粉、抗酸药、灭火器原料、温和清洗剂', safety:'低危试剂，受热分解放出 CO2'},
+{id:29, name:'硫酸铜', nameEn:'Copper Sulfate', cas:'7758-98-7', formula:'CuSO4·5H2O', mw:249.68, cat:'salt', alias:['胆矾','蓝矾'], appearance:'蓝色三斜晶体(五水合物)', mp:'150 °C(失水)', bp:'650 °C(分解)', density:'2.28 g/cm³', hazards:['irritant','environmental'], uses:'波尔多液杀菌剂、电镀、化学镀铜、教学演示', safety:'对水生生物毒性大，废液不可直接倒入下水道'},
+{id:30, name:'硝酸银', nameEn:'Silver Nitrate', cas:'7761-88-8', formula:'AgNO3', mw:169.87, cat:'salt', alias:['银盐'], appearance:'无色透明菱形晶体，见光变黑', mp:'212 °C', bp:'444 °C(分解)', density:'4.35 g/cm³', hazards:['oxidizer','corrosive','environmental'], uses:'卤素离子检验、感光材料、化学镀银、医用烧灼', safety:'棕色瓶避光保存；皮肤接触留黑斑，操作戴手套'},
+{id:31, name:'氯化铁', nameEn:'Ferric Chloride', cas:'7705-08-0', formula:'FeCl3', mw:162.20, cat:'salt', alias:['三氯化铁'], appearance:'棕黑色晶体或黄褐色块状，易潮解', mp:'306 °C', bp:'316 °C', density:'2.90 g/cm³', hazards:['corrosive','irritant'], uses:'PCB 蚀刻、净水絮凝剂、有机合成催化剂', safety:'腐蚀金属与皮肤，溶液呈强酸性'},
+{id:32, name:'硫酸亚铁', nameEn:'Ferrous Sulfate', cas:'7782-63-0', formula:'FeSO4·7H2O', mw:278.01, cat:'salt', alias:['绿矾'], appearance:'淡蓝绿色单斜晶体(七水合物)', mp:'64 °C(失水)', bp:'—', density:'1.90 g/cm³', hazards:['irritant'], uses:'净水剂、补铁剂、农药、还原剂', safety:'溶液易被氧化为黄色 Fe3+，现配现用'},
+{id:33, name:'亚硝酸钠', nameEn:'Sodium Nitrite', cas:'7632-00-0', formula:'NaNO2', mw:69.00, cat:'salt', alias:[], appearance:'白色至微黄色晶体或粉末', mp:'271 °C', bp:'320 °C(分解)', density:'2.17 g/cm³', hazards:['oxidizer','toxic'], uses:'食品防腐护色剂(限量)、金属防锈、染料合成', safety:'误食可致高铁血红蛋白血症(肠源性青紫)，严禁当成食盐使用'},
+{id:34, name:'碘化钾', nameEn:'Potassium Iodide', cas:'7681-11-0', formula:'KI', mw:166.00, cat:'salt', alias:[], appearance:'无色或白色立方晶体', mp:'681 °C', bp:'1330 °C', density:'3.12 g/cm³', hazards:['health'], uses:'碘量法滴定、显影剂、甲状腺防护用药', safety:'溶液见光易析出碘变黄，避光保存'},
+{id:35, name:'高锰酸钾', nameEn:'Potassium Permanganate', cas:'7722-64-7', formula:'KMnO4', mw:158.03, cat:'oxide', alias:['灰锰氧','PP粉'], appearance:'深紫色细长斜方柱状晶体', mp:'240 °C(分解)', bp:'—', density:'2.70 g/cm³', hazards:['oxidizer','health','environmental'], uses:'消毒杀菌、氧化滴定、水质净化、有机合成氧化剂', safety:'与浓硫酸或有机物混合可能爆炸，远离还原剂存放'},
+{id:36, name:'重铬酸钾', nameEn:'Potassium Dichromate', cas:'7778-50-9', formula:'K2Cr2O7', mw:294.18, cat:'oxide', alias:['红矾钾'], appearance:'橙红色三斜晶体', mp:'398 °C', bp:'500 °C(分解)', density:'2.68 g/cm³', hazards:['oxidizer','toxic','health','environmental'], uses:'COD 测定、铬酸洗液、鞣革、火柴制造', safety:'六价铬为强致癌物！废液必须专门收集处理'},
+{id:37, name:'氯酸钾', nameEn:'Potassium Chlorate', cas:'3811-04-9', formula:'KClO3', mw:122.55, cat:'oxide', alias:[], appearance:'白色有光泽的晶体或粉末', mp:'356 °C', bp:'400 °C(分解)', density:'2.34 g/cm³', hazards:['oxidizer','explosive','toxic'], uses:'火柴头、烟花氧化剂、实验室制氧气(催化分解)', safety:'与硫、磷等可燃物混合受撞击即爆炸，属易制爆管控品'},
+{id:38, name:'硝酸钾', nameEn:'Potassium Nitrate', cas:'7757-79-1', formula:'KNO3', mw:101.10, cat:'oxide', alias:['硝石','火硝'], appearance:'无色透明晶体或白色粉末', mp:'334 °C', bp:'400 °C(分解)', density:'2.11 g/cm³', hazards:['oxidizer'], uses:'黑火药原料、食品腌制、复合肥料、热处理盐浴', safety:'强氧化剂，与可燃物混合可剧烈燃烧，易制爆管控'},
+{id:39, name:'硝酸铵', nameEn:'Ammonium Nitrate', cas:'6484-52-2', formula:'NH4NO3', mw:80.04, cat:'oxide', alias:['硝铵'], appearance:'无色透明晶体或白色颗粒', mp:'170 °C', bp:'210 °C(分解)', density:'1.72 g/cm³', hazards:['oxidizer','explosive'], uses:'氮肥、工业炸药、制冷剂(吸热溶解)', safety:'受高温或猛烈撞击有爆炸危险，严格管控试剂'},
+{id:40, name:'过氧化氢', nameEn:'Hydrogen Peroxide', cas:'7722-84-1', formula:'H2O2', mw:34.01, cat:'oxide', alias:['双氧水'], appearance:'无色透明液体(常见 30% 或 3%)', mp:'-0.4 °C', bp:'150 °C(分解)', density:'1.11 g/cm³(30%)', hazards:['oxidizer','corrosive','irritant'], uses:'消毒漂白、火箭推进剂、环境治理、化学发光实验', safety:'见光遇热易分解，棕色瓶冷藏；高浓度接触皮肤致白斑灼伤'},
+{id:41, name:'金属钠', nameEn:'Sodium Metal', cas:'7440-23-5', formula:'Na', mw:22.99, cat:'metal', alias:[], appearance:'银白色柔软金属，切面迅速变暗', mp:'97.8 °C', bp:'883 °C', density:'0.97 g/cm³', hazards:['waterReactive','corrosive','flammable'], uses:'有机合成还原剂、钠灯、导热剂、氰化钠生产', safety:'保存于煤油中！遇水剧烈反应起火爆炸，严禁用手接触'},
+{id:42, name:'镁', nameEn:'Magnesium', cas:'7439-95-4', formula:'Mg', mw:24.31, cat:'metal', alias:['镁带'], appearance:'银白色轻质金属条带或粉末', mp:'650 °C', bp:'1090 °C', density:'1.74 g/cm³', hazards:['flammable','waterReactive'], uses:'闪光弹、铝合金、还原剂、教学燃烧实验', safety:'燃烧发出耀眼白光，不可直视；镁火不可用 CO2 或水扑灭，用干燥沙土'},
+{id:43, name:'锌', nameEn:'Zinc', cas:'7440-66-6', formula:'Zn', mw:65.38, cat:'metal', alias:['锌粉','锌粒'], appearance:'蓝白色金属，常温下较脆', mp:'419.5 °C', bp:'907 °C', density:'7.13 g/cm³', hazards:['flammable','environmental'], uses:'镀锌防腐、干电池负极、实验室制氢气、还原剂', safety:'锌粉易燃，粉尘有爆炸风险，远离氧化剂'},
+{id:44, name:'铝', nameEn:'Aluminium', cas:'7429-90-5', formula:'Al', mw:26.98, cat:'metal', alias:['铝粉','铝箔'], appearance:'银白色轻金属，表面有氧化膜', mp:'660 °C', bp:'2519 °C', density:'2.70 g/cm³', hazards:['flammable'], uses:'铝热反应、包装材料、导电材料、烟花银色剂', safety:'铝粉属可燃粉尘，大量积聚遇火星有爆炸危险'},
+{id:45, name:'氯气', nameEn:'Chlorine', cas:'7782-50-5', formula:'Cl2', mw:70.90, cat:'gas', alias:['液氯'], appearance:'黄绿色有强烈刺激性气味的气体', mp:'-101 °C', bp:'-34 °C', density:'3.2 g/L(气)', hazards:['toxic','corrosive','environmental','compressed'], uses:'自来水消毒、漂白剂、PVC 原料、农药中间体', safety:'剧毒窒息性气体！一战化学武器，实验须在密闭通风系统内进行'},
+{id:46, name:'氢气', nameEn:'Hydrogen', cas:'1333-74-0', formula:'H2', mw:2.02, cat:'gas', alias:[], appearance:'无色无味气体，密度最小', mp:'-259 °C', bp:'-253 °C', density:'0.09 g/L(气)', hazards:['flammable','explosive','compressed'], uses:'燃料电池、合成氨、加氢还原、气球充填(受限)', safety:'爆炸极限 4%~75% 极宽，点火前必须验纯'},
+{id:47, name:'氧气', nameEn:'Oxygen', cas:'7782-44-7', formula:'O2', mw:32.00, cat:'gas', alias:[], appearance:'无色无味气体，液氧淡蓝色', mp:'-218 °C', bp:'-183 °C', density:'1.43 g/L(气)', hazards:['oxidizer','compressed'], uses:'医疗急救、焊接切割、炼钢、助燃实验', safety:'助燃！高压氧气瓶严禁接触油脂，否则自燃爆炸'},
+{id:48, name:'碘', nameEn:'Iodine', cas:'7553-56-2', formula:'I2', mw:253.81, cat:'other', alias:['碘单质','碘片'], appearance:'紫黑色带金属光泽的片状晶体，易升华', mp:'113.7 °C', bp:'184.3 °C', density:'4.93 g/cm³', hazards:['toxic','corrosive','environmental'], uses:'碘酒消毒、淀粉检验、甲状腺造影、碘量法', safety:'蒸气刺激黏膜，升华后密闭保存；与氨反应生成爆炸物'},
+{id:49, name:'硫粉', nameEn:'Sulfur', cas:'7704-34-9', formula:'S', mw:32.06, cat:'other', alias:['硫磺'], appearance:'黄色脆性结晶或粉末，有特殊臭味', mp:'115 °C', bp:'445 °C', density:'2.07 g/cm³', hazards:['flammable','irritant'], uses:'橡胶硫化、火药、硫磺皂、农药、硫酸工业', safety:'燃烧生成刺激性 SO2，粉尘有爆炸风险'},
+{id:50, name:'活性炭', nameEn:'Activated Carbon', cas:'7440-44-0', formula:'C', mw:12.01, cat:'other', alias:['活性炭黑'], appearance:'黑色多孔粉末或颗粒', mp:'>3000 °C', bp:'—', density:'0.5 g/cm³(堆密度)', hazards:[], uses:'脱色吸附、净水净气、防毒面具滤料、催化剂载体', safety:'低危；粉状活性炭属可燃粉尘，注意防火'},
+{id:51, name:'酚酞', nameEn:'Phenolphthalein', cas:'77-09-8', formula:'C20H14O4', mw:318.32, cat:'organic', alias:[], appearance:'白色或微带黄色的细小晶体', mp:'262 °C', bp:'—', density:'1.28 g/cm³', hazards:['health','irritant'], uses:'酸碱指示剂(pH 8.2~10 变红)、曾用作泻药', safety:'疑似致癌，避免皮肤长期接触与吸入粉尘'},
+{id:52, name:'甲醛溶液', nameEn:'Formaldehyde Solution', cas:'50-00-0', formula:'HCHO', mw:30.03, cat:'organic', alias:['福尔马林','蚁醛'], appearance:'无色有强烈刺激性气味液体(35~40%)', mp:'-92 °C', bp:'96 °C(37%)', density:'1.09 g/cm³(37%)', hazards:['flammable','toxic','health','corrosive'], uses:'标本防腐、脲醛树脂、消毒熏蒸、纺织整理剂', safety:'确认致癌物！刺激性极强，必须在通风橱中操作'},
+{id:53, name:'苯酚', nameEn:'Phenol', cas:'108-95-2', formula:'C6H5OH', mw:94.11, cat:'organic', alias:['石炭酸'], appearance:'无色或淡粉色针状晶体，有特殊气味', mp:'40.9 °C', bp:'181.8 °C', density:'1.07 g/cm³', hazards:['toxic','corrosive','health'], uses:'酚醛树脂、外科消毒剂(稀释)、尼龙原料', safety:'皮肤接触先变白后灼伤溃烂，立即用聚乙二醇或酒精擦洗'},
+{id:54, name:'丙三醇', nameEn:'Glycerol', cas:'56-81-5', formula:'C3H8O3', mw:92.09, cat:'organic', alias:['甘油'], appearance:'无色透明黏稠液体，味甜', mp:'18 °C', bp:'290 °C(分解)', density:'1.26 g/cm³', hazards:[], uses:'保湿护肤品、食品甜味剂、炸药(硝化甘油)、润滑防冻', safety:'低危试剂；与强氧化剂(如 KMnO4)接触可自燃'}
+];
+
+/* ================= 状态 ================= */
+const state = {
+  kw:'',
+  cat:'all',
+  hazards:new Set(),
+  sort:'default',
+  favOnly:false,
+  online:true,
+  crawler:true,
+  favs:new Set(JSON.parse(localStorage.getItem('chemFavs')||'[]'))
+};
+
+const $ = s=>document.querySelector(s);
+const grid=$('#grid'), empty=$('#empty'), mask=$('#modal-mask'), modal=$('#modal');
+
+/* ================= 工具 ================= */
+function fmtFormula(f){return f.replace(/(\d+)/g,'<sub>$1</sub>');}
+function riskLevel(c){
+  if(c.hazards.some(h=>['toxic','explosive','health'].includes(h))) return {k:'high',t:'高危'};
+  if(c.hazards.some(h=>['corrosive','flammable','oxidizer','waterReactive','compressed'].includes(h))) return {k:'mid',t:'中危'};
+  return {k:'low',t:'低危'};
+}
+function saveFavs(){localStorage.setItem('chemFavs',JSON.stringify([...state.favs]));}
+
+/* ================= 筛选 + 渲染 ================= */
+function getFiltered(){
+  let list=CHEMICALS.filter(c=>{
+    if(state.cat!=='all'&&c.cat!==state.cat) return false;
+    if(state.favOnly&&!state.favs.has(c.id)) return false;
+    if(state.hazards.size&&![...state.hazards].some(h=>c.hazards.includes(h))) return false;
+    if(state.kw){
+      const kw=state.kw.toLowerCase();
+      const fields=[c.name,c.nameEn,c.cas,c.formula,(c.alias||[]).join(' ')].join(' ').toLowerCase();
+      if(!fields.includes(kw)) return false;
+    }
+    return true;
+  });
+  if(state.sort==='mw-asc') list.sort((a,b)=>a.mw-b.mw);
+  else if(state.sort==='mw-desc') list.sort((a,b)=>b.mw-a.mw);
+  else if(state.sort==='name') list.sort((a,b)=>a.nameEn.localeCompare(b.nameEn));
+  return list;
+}
+
+function render(){
+  const list=getFiltered();
+  $('#result-count').innerHTML=`当前显示 <b>${list.length}</b> / ${CHEMICALS.length} 种化学品`;
+  grid.innerHTML=list.map((c,i)=>{
+    const cat=CATEGORIES[c.cat], risk=riskLevel(c);
+    const tags=c.hazards.slice(0,3).map(h=>{
+      const hz=HAZARDS[h];
+      return `<span class="hazard-tag" style="color:${hz.color};border-color:${hz.color}66;background:${hz.color}14">${hz.icon} ${hz.label}</span>`;
+    }).join('');
+    const more=c.hazards.length>3?`<span class="tag-more">+${c.hazards.length-3}</span>`:'';
+    const safeTag=c.hazards.length===0?`<span class="hazard-tag" style="color:${'#3ddc84'};border-color:#3ddc8466;background:#3ddc8414">✅ 低危试剂</span>`:'';
+    return `
+    <div class="card" data-id="${c.id}" style="animation-delay:${Math.min(i*40,600)}ms">
+      <span class="risk-pill risk-${risk.k}">${risk.t}</span>
+      <div class="card-top">
+        <div class="cat-icon" style="color:${cat.color};border-color:${cat.color}55;background:${cat.color}12">${cat.icon}</div>
+        <div class="card-name">
+          <h3>${c.name}</h3>
+          <div class="en">${c.nameEn}</div>
+        </div>
+        <button class="fav-btn ${state.favs.has(c.id)?'on':''}" data-fav="${c.id}" title="收藏">${state.favs.has(c.id)?'★':'☆'}</button>
+      </div>
+      <div class="card-formula">${fmtFormula(c.formula)}</div>
+      <div class="card-cas">CAS No. <b>${c.cas}</b></div>
+      <div class="card-tags">${tags}${more}${safeTag}</div>
+    </div>`;
+  }).join('');
+  empty.style.display=list.length?'none':'block';
+  renderStats();
+}
+
+function renderStats(){
+  const high=CHEMICALS.filter(c=>riskLevel(c).k==='high').length;
+  $('#stats').innerHTML=`
+    <div class="stat-chip">🧪<div><div class="num">${CHEMICALS.length}</div><div class="lbl">收录试剂</div></div></div>
+    <div class="stat-chip">🗂<div><div class="num">${Object.keys(CATEGORIES).length}</div><div class="lbl">试剂分类</div></div></div>
+    <div class="stat-chip">☠️<div><div class="num" style="color:var(--danger)">${high}</div><div class="lbl">高危化学品</div></div></div>
+    <div class="stat-chip">⭐<div><div class="num" style="color:#ffd65a">${state.favs.size}</div><div class="lbl">我的收藏</div></div></div>`;
+}
+
+/* ================= 筛选控件 ================= */
+function buildChips(){
+  $('#cat-chips').innerHTML=
+    `<button class="chip ${state.cat==='all'?'active':''}" data-cat="all">✨ 全部</button>`+
+    Object.entries(CATEGORIES).map(([k,v])=>
+      `<button class="chip ${state.cat===k?'active':''}" data-cat="${k}">${v.icon} ${v.label}</button>`).join('');
+  $('#hazard-chips').innerHTML=Object.entries(HAZARDS).map(([k,v])=>
+    `<button class="chip hazard-chip ${state.hazards.has(k)?'active':''}" data-hazard="${k}" style="--hc:${v.color}">${v.icon} ${v.label}</button>`).join('');
+}
+
+/* ================= 详情弹窗 ================= */
+function openModal(id){
+  const c=CHEMICALS.find(x=>x.id===id); if(!c) return;
+  if(typeof bpNotifyChem==='function') bpNotifyChem(c.name);
+  const cat=CATEGORIES[c.cat], risk=riskLevel(c);
+  const sig=risk.k==='high'?['signal-danger','⚠ 危险 DANGER']:risk.k==='mid'?['signal-warning','⚠ 警告 WARNING']:['signal-safe','✅ 常规试剂'];
+  const ghs=c.hazards.map(h=>{
+    const hz=HAZARDS[h];
+    return `<div class="ghs-item"><div class="ghs-diamond"><span>${hz.icon}</span></div>${hz.label}</div>`;
+  }).join('')||'<div style="color:var(--text-dim);font-size:13px">无显著危险性，按常规实验规范操作即可</div>';
+  modal.innerHTML=`
+    <div class="modal-head">
+      <div class="cat-icon" style="color:${cat.color};border-color:${cat.color}55;background:${cat.color}12">${cat.icon}</div>
+      <div class="modal-title">
+        <h2>${c.name} <button class="fav-btn ${state.favs.has(c.id)?'on':''}" data-fav="${c.id}" style="font-size:22px;vertical-align:middle">${state.favs.has(c.id)?'★':'☆'}</button></h2>
+        <div class="en">${c.nameEn} · ${cat.label}</div>
+      </div>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-formula">${fmtFormula(c.formula)}</div>
+    ${c.alias&&c.alias.length?`<div class="modal-alias">俗名 / 别名：${c.alias.join('、')}</div>`:''}
+    <div class="info-grid">
+      <div class="info-item"><div class="k">CAS 登录号</div><div class="v">${c.cas}</div></div>
+      <div class="info-item"><div class="k">分子量</div><div class="v">${c.mw} g/mol</div></div>
+      <div class="info-item"><div class="k">熔点</div><div class="v">${c.mp}</div></div>
+      <div class="info-item"><div class="k">沸点</div><div class="v">${c.bp}</div></div>
+      <div class="info-item"><div class="k">密度</div><div class="v">${c.density}</div></div>
+      <div class="info-item"><div class="k">外观性状</div><div class="v" style="font-size:13px;line-height:1.5">${c.appearance}</div></div>
+    </div>
+    <div class="section-title">⚠ 危险性警示</div>
+    <span class="signal-word ${sig[0]}">${sig[1]}</span>
+    <div class="ghs-row">${ghs}</div>
+    <div class="section-title">🎯 主要用途</div>
+    <div class="desc-box">${c.uses}</div>
+    <div class="section-title">🛡 安全须知</div>
+    <div class="desc-box safety">${c.safety}</div>`;
+  mask.classList.add('show');
+  document.body.style.overflow='hidden';
+  $('#modal-close').onclick=closeModal;
+}
+function closeModal(){mask.classList.remove('show');document.body.style.overflow='';}
+
+/* ================= 事件绑定 ================= */
+$('#search-input').addEventListener('input',e=>{
+  state.kw=e.target.value.trim();
+  $('#clear-btn').style.display=state.kw?'block':'none';
+  render();
+  clearTimeout(searchTimer);
+  clearTimeout(crawlerTimer);
+  if(state.online) searchTimer=setTimeout(()=>pubchemSearch(state.kw),650);
+  if(state.crawler) crawlerTimer=setTimeout(()=>crawlerSearch(state.kw),900);
+});
+$('#search-input').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    clearTimeout(searchTimer);
+    clearTimeout(crawlerTimer);
+    if(state.online) pubchemSearch(state.kw);
+    if(state.crawler) crawlerSearch(state.kw);
+  }
+});
+$('#clear-btn').addEventListener('click',()=>{
+  state.kw='';$('#search-input').value='';$('#clear-btn').style.display='none';
+  clearTimeout(searchTimer);
+  clearTimeout(crawlerTimer);
+  if(pubchemCtl) pubchemCtl.abort();
+  if(crawlerCtl) crawlerCtl.abort();
+  $('#online-section').style.display='none';
+  $('#crawler-section').style.display='none';
+  render();
+});
+$('#cat-chips').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-cat]'); if(!btn) return;
+  state.cat=btn.dataset.cat; buildChips(); render();
+});
+$('#hazard-chips').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-hazard]'); if(!btn) return;
+  const h=btn.dataset.hazard;
+  state.hazards.has(h)?state.hazards.delete(h):state.hazards.add(h);
+  buildChips(); render();
+});
+$('#sort-select').addEventListener('change',e=>{state.sort=e.target.value;render();});
+$('#fav-toggle').addEventListener('click',e=>{
+  state.favOnly=!state.favOnly;
+  e.currentTarget.classList.toggle('active',state.favOnly);
+  render();
+});
+document.addEventListener('click',e=>{
+  const fav=e.target.closest('[data-fav]');
+  if(fav){
+    e.stopPropagation();
+    const id=+fav.dataset.fav;
+    state.favs.has(id)?state.favs.delete(id):state.favs.add(id);
+    saveFavs(); render();
+    if(mask.classList.contains('show')) openModal(id);
+    return;
+  }
+  const oc=e.target.closest('.online-card');
+  if(oc){openOnlineModal(+oc.dataset.cid);return;}
+  const cc=e.target.closest('.crawler-card');
+  if(cc){openCrawlerModal(cc.dataset.cb);return;}
+  const card=e.target.closest('.card');
+  if(card) openModal(+card.dataset.id);
+});
+mask.addEventListener('click',e=>{if(e.target===mask) closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape') closeModal();});
+
+/* 卡片鼠标光晕 */
+grid.addEventListener('mousemove',e=>{
+  const card=e.target.closest('.card'); if(!card) return;
+  const r=card.getBoundingClientRect();
+  card.style.setProperty('--mx',(e.clientX-r.left)+'px');
+  card.style.setProperty('--my',(e.clientY-r.top)+'px');
+});
+
+/* ================= 分子背景动画 ================= */
+(function(){
+  const cv=$('#molecule-canvas'), ctx=cv.getContext('2d');
+  let W,H,nodes=[],bubbles=[];
+  const COLORS=['52,224,200','124,92,255','255,107,157'];
+  function resize(){
+    W=cv.width=innerWidth; H=cv.height=innerHeight;
+    const n=Math.min(70,Math.floor(W/22));
+    nodes=Array.from({length:n},()=>({
+      x:Math.random()*W, y:Math.random()*H,
+      vx:(Math.random()-.5)*.35, vy:(Math.random()-.5)*.35,
+      r:Math.random()*2.2+1.2,
+      c:COLORS[Math.random()*3|0]
+    }));
+  }
+  function spawnBubble(){
+    bubbles.push({x:Math.random()*W,y:H+10,r:Math.random()*3+1.5,s:Math.random()*.7+.35,a:0,c:COLORS[Math.random()*3|0]});
+  }
+  function tick(){
+    ctx.clearRect(0,0,W,H);
+    for(const p of nodes){
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0||p.x>W) p.vx*=-1;
+      if(p.y<0||p.y>H) p.vy*=-1;
+    }
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i],b=nodes[j];
+        const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);
+        if(d<130){
+          ctx.strokeStyle=`rgba(${a.c},${(1-d/130)*.16})`;
+          ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+        }
+      }
+    }
+    for(const p of nodes){
+      ctx.fillStyle=`rgba(${p.c},.55)`;
+      ctx.shadowColor=`rgba(${p.c},.8)`; ctx.shadowBlur=8;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();
+      ctx.shadowBlur=0;
+    }
+    if(Math.random()<.03&&bubbles.length<18) spawnBubble();
+    bubbles=bubbles.filter(b=>b.y>-20);
+    for(const b of bubbles){
+      b.y-=b.s; b.a=Math.min(b.a+.01,.35);
+      ctx.strokeStyle=`rgba(${b.c},${b.a})`;
+      ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.stroke();
+    }
+    requestAnimationFrame(tick);
+  }
+  addEventListener('resize',resize);
+  resize(); tick();
+})();
+
+/* ================= PubChem 在线查询 ================= */
+const PUG='https://pubchem.ncbi.nlm.nih.gov/rest/pug';
+const PROPS='Title,MolecularFormula,MolecularWeight,IUPACName,XLogP,TPSA';
+/* GHS 象形图映射 */
+const GHS_PIC={
+  GHS01:{label:'爆炸物',icon:'💥'},GHS02:{label:'易燃',icon:'🔥'},
+  GHS03:{label:'氧化性',icon:'⚡'},GHS04:{label:'压缩气体',icon:'🎈'},
+  GHS05:{label:'腐蚀',icon:'🧪'},GHS06:{label:'急性毒性',icon:'☠️'},
+  GHS07:{label:'有害/刺激',icon:'❗'},GHS08:{label:'健康危害',icon:'⚕️'},
+  GHS09:{label:'环境危害',icon:'🐟'}
+};
+/* H 危险说明中文对照表(GHS 标准) */
+const H_MAP={
+  H200:'不稳定爆炸物',H201:'爆炸物；整体爆炸危险',H202:'爆炸物；严重迸射危险',H203:'爆炸物；起火、爆轰或迸射危险',
+  H204:'起火或迸射危险',H205:'受热可能整体爆炸',H220:'极易燃气体',H221:'易燃气体',H222:'极易燃气溶胶',H223:'易燃气溶胶',
+  H224:'极易燃液体和蒸气',H225:'高度易燃液体和蒸气',H226:'易燃液体和蒸气',H227:'可燃液体',H228:'易燃固体',
+  H229:'压力容器：受热可爆',H230:'即使无空气也可能发生爆炸反应',H231:'高压/高温下即使无空气也可能爆炸',
+  H240:'受热可能爆炸',H241:'受热可能起火或爆炸',H242:'受热可能起火',H250:'暴露在空气中会自燃',
+  H251:'自热；可能燃烧',H252:'大量时自热；可能燃烧',H260:'遇水放出可自燃的易燃气体',H261:'遇水放出易燃气体',
+  H270:'可能导致或加剧燃烧；氧化剂',H271:'可能引起燃烧或爆炸；强氧化剂',H272:'可能加剧燃烧；氧化剂',
+  H280:'内装加压气体；遇热可能爆炸',H281:'内装冷冻气体；可能造成低温灼伤',H290:'可能腐蚀金属',
+  H300:'吞咽致命',H301:'吞咽有毒',H302:'吞咽有害',H303:'吞咽可能有害',H304:'吞咽并进入呼吸道可能致命',
+  H305:'吞咽并进入呼吸道可能有害',H310:'皮肤接触致命',H311:'皮肤接触有毒',H312:'皮肤接触有害',H313:'皮肤接触可能有害',
+  H314:'造成严重皮肤灼伤和眼损伤',H315:'造成皮肤刺激',H316:'造成轻微皮肤刺激',H317:'可能导致皮肤过敏反应',
+  H318:'造成严重眼损伤',H319:'造成严重眼刺激',H320:'造成眼刺激',H330:'吸入致命',H331:'吸入有毒',H332:'吸入有害',
+  H333:'吸入可能有害',H334:'吸入可能导致过敏、哮喘症状或呼吸困难',H335:'可能引起呼吸道刺激',H336:'可能引起昏睡或眩晕',
+  H340:'可能导致遗传性缺陷',H341:'怀疑会导致遗传性缺陷',H350:'可能致癌',H351:'怀疑会致癌',
+  H360:'可能对生育能力或胎儿造成伤害',H361:'怀疑对生育能力或胎儿造成伤害',H362:'可能对母乳喂养的儿童造成伤害',
+  H370:'对器官造成损害',H371:'可能对器官造成损害',H372:'长期或反复接触会对器官造成伤害',H373:'长期或反复接触可能对器官造成伤害',
+  H400:'对水生生物毒性极大',H401:'对水生生物有毒',H402:'对水生生物有害',
+  H410:'对水生生物毒性极大并具有长期持续影响',H411:'对水生生物有毒并具有长期持续影响',
+  H412:'对水生生物有害并具有长期持续影响',H413:'可能对水生生物造成长期持续有害影响'
+};
+let pubchemCtl=null, searchTimer=null;
+const isChinese=s=>/[\u4e00-\u9fa5]/.test(s);
+const looksLikeFormula=s=>/^[A-Z][A-Za-z0-9()\[\]·.]*$/.test(s)&&/\d/.test(s);
+
+/* 中文关键词 → 借助本地库找到英文名 */
+function zhToEnglish(kw){
+  const hit=CHEMICALS.find(c=>c.name===kw||(c.alias||[]).includes(kw))
+        ||CHEMICALS.find(c=>c.name.includes(kw)||(c.alias||[]).some(a=>a.includes(kw)||kw.includes(a)));
+  return hit?hit.nameEn:null;
+}
+async function tryFetch(path,signal){
+  const r=await fetch(PUG+path,{signal});
+  if(!r.ok) throw r.status;
+  return r.json();
+}
+async function pubchemSearch(kw){
+  const sec=$('#online-section'), body=$('#online-body'), badge=$('#online-badge');
+  if(!kw||(kw.length<2&&!isChinese(kw))){sec.style.display='none';return;}
+  if(pubchemCtl) pubchemCtl.abort();
+  pubchemCtl=new AbortController();
+  const signal=pubchemCtl.signal;
+  sec.style.display='block';
+  badge.textContent='';
+  body.innerHTML='<div class="online-loading"><div class="spinner"></div>正在实时查询 PubChem 数据库…</div>';
+  let q=kw, viaZh=null;
+  if(isChinese(kw)){
+    viaZh=zhToEnglish(kw);
+    if(viaZh) q=viaZh;
+  }
+  try{
+    let cids=null;
+    try{
+      cids=(await tryFetch('/compound/name/'+encodeURIComponent(q)+'/cids/JSON',signal)).IdentifierList.CID;
+    }catch(err){
+      if(err===404&&looksLikeFormula(q)){
+        try{cids=(await tryFetch('/compound/formula/'+encodeURIComponent(q)+'/cids/JSON?MaxRecords=10',signal)).IdentifierList.CID;}
+        catch(err2){if(err2.name==='AbortError') throw err2;}
+      }else throw err;
+    }
+    if(!cids||!cids.length){
+      body.innerHTML=`<div class="online-tip">PubChem 未找到「${kw}」${isChinese(kw)?'，PubChem 为英文数据库，建议输入 <code>英文名</code> / <code>CAS号</code> / <code>分子式</code>':''}</div>`;
+      return;
+    }
+    cids=cids.slice(0,8);
+    const d=await tryFetch('/compound/cid/'+cids.join(',')+'/property/'+PROPS+'/JSON',signal);
+    renderOnline(d.PropertyTable.Properties, kw, viaZh);
+  }catch(e){
+    if(e.name==='AbortError') return;
+    if(e===404){
+      body.innerHTML=`<div class="online-tip">PubChem 未找到「${kw}」${isChinese(kw)?'，PubChem 为英文数据库，建议输入 <code>英文名</code> / <code>CAS号</code> / <code>分子式</code>':''}</div>`;
+    }else{
+      body.innerHTML='<div class="online-tip">⚠ 无法连接 PubChem（需联网），请检查网络。本地试剂库查询不受影响。</div>';
+    }
+  }
+}
+function renderOnline(list, kw, viaZh){
+  $('#online-badge').textContent=(viaZh?`中文「${kw}」→ ${viaZh} · `:'')+'Top '+list.length;
+  $('#online-body').innerHTML='<div class="online-grid">'+list.map((c,i)=>`
+    <div class="online-card" data-cid="${c.CID}" style="animation-delay:${i*60}ms">
+      <img class="mol-img" loading="lazy" src="${PUG}/compound/cid/${c.CID}/PNG?image_size=small" alt="${c.Title}">
+      <h4 title="${c.Title}">${c.Title}</h4>
+      <div class="f">${fmtFormula(c.MolecularFormula||'')}</div>
+      <div class="cid">CID ${c.CID} · ${c.MolecularWeight} g/mol</div>
+    </div>`).join('')+'</div>';
+}
+/* 在线化合物详情 */
+async function openOnlineModal(cid){
+  modal.innerHTML='<div style="text-align:center;padding:56px 0"><div class="spinner" style="margin:0 auto 16px"></div><div style="color:var(--text-dim);font-size:13px">正在加载 CID '+cid+' 详情…</div></div>';
+  mask.classList.add('show');
+  document.body.style.overflow='hidden';
+  try{
+    const r=await fetch(PUG+'/compound/cid/'+cid+'/property/'+PROPS+'/JSON');
+    const c=(await r.json()).PropertyTable.Properties[0];
+    if(typeof bpNotifyChem==='function') bpNotifyChem(c.Title);
+    modal.innerHTML=`
+      <div class="modal-head">
+        <div class="cat-icon" style="color:var(--accent2);border-color:#7c5cff55;background:#7c5cff12">🌐</div>
+        <div class="modal-title">
+          <h2>${c.Title}</h2>
+          <div class="en">PubChem 在线数据 · CID ${cid}</div>
+        </div>
+        <button class="modal-close" id="modal-close">✕</button>
+      </div>
+      <div class="modal-formula">${fmtFormula(c.MolecularFormula||'')}</div>
+      <img class="modal-mol" src="${PUG}/compound/cid/${cid}/PNG" alt="2D 结构式">
+      <div class="info-grid">
+        <div class="info-item"><div class="k">分子量</div><div class="v">${c.MolecularWeight} g/mol</div></div>
+        <div class="info-item"><div class="k">脂水分配系数 XLogP</div><div class="v">${c.XLogP??'—'}</div></div>
+        <div class="info-item"><div class="k">拓扑极性表面积</div><div class="v">${c.TPSA??'—'} Å²</div></div>
+      </div>
+      <div class="info-item" style="margin-top:10px"><div class="k">IUPAC 命名</div><div class="v" style="font-size:13px;line-height:1.6;font-weight:500">${c.IUPACName||'—'}</div></div>
+      <div class="section-title">⚠ GHS 危险性分类（PubChem 供应商上报数据）</div>
+      <div id="ghs-box"><div class="online-loading"><div class="spinner"></div>加载安全数据中…</div></div>
+      <div style="text-align:center"><a class="pubchem-link" href="https://pubchem.ncbi.nlm.nih.gov/compound/${cid}" target="_blank" rel="noopener">🔗 在 PubChem 查看完整档案 ↗</a></div>`;
+    $('#modal-close').onclick=closeModal;
+    loadGHS(cid);
+  }catch(e){
+    modal.innerHTML='<div style="text-align:center;padding:46px 0;color:var(--text-dim)">⚠ 加载失败，请检查网络后重试<br><br><button class="chip" id="modal-close">关闭</button></div>';
+    $('#modal-close').onclick=closeModal;
+  }
+}
+/* 解析 GHS 安全数据(递归查找小节) */
+function findGHS(rec){
+  let found=null;
+  (function walk(sec){
+    if(!sec||found) return;
+    if(sec.TOCHeading==='GHS Classification'){found=sec.Information||[];return;}
+    (sec.Section||[]).forEach(walk);
+  })({Section:rec.Section});
+  return found;
+}
+async function loadGHS(cid){
+  const box=$('#ghs-box'); if(!box) return;
+  try{
+    const r=await fetch('https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/'+cid+'/JSON?heading=GHS%20Classification');
+    if(!r.ok) throw r.status;
+    const d=await r.json();
+    const info=findGHS(d.Record);
+    if(!info||!info.length){box.innerHTML='<div class="online-tip">该化合物暂无 GHS 分类数据</div>';return;}
+    let signal=''; const pics=new Set(); const hRows=[]; const seen=new Set();
+    for(const it of info){
+      const strs=((it.Value&&it.Value.StringWithMarkup)||[]).map(x=>x.String);
+      if(it.Name==='Signal') signal=strs[0]||'';
+      else if(/Pictogram/.test(it.Name)) (strs.join(',').match(/GHS\d{2}/g)||[]).forEach(p=>pics.add(p));
+      else if(/Hazard Statement/.test(it.Name)){
+        for(const s of strs){
+          const m=s.match(/^(H\d{3}[A-Za-z0-9+.]*)\s*(?:\(([\d.]+%)\))?\s*:?\s*(.*)/);
+          if(m&&!seen.has(m[1]+m[2])){seen.add(m[1]+m[2]);hRows.push({code:m[1],pct:m[2]||'',en:m[3]||''});}
+        }
+      }
+    }
+    const sigCls=/danger/i.test(signal)?'signal-danger':'signal-warning';
+    box.innerHTML=`
+      ${signal?`<span class="signal-word ${sigCls}">⚠ ${/danger/i.test(signal)?'危险 DANGER':'警告 WARNING'}</span>`:''}
+      ${pics.size?`<div class="ghs-row">${[...pics].map(p=>{const g=GHS_PIC[p]||{label:p,icon:'⚠️'};return `<div class="ghs-item"><div class="ghs-diamond"><span>${g.icon}</span></div>${g.label}</div>`;}).join('')}</div>`:''}
+      ${hRows.length?`<table class="h-table">${hRows.slice(0,14).map(h=>`<tr><td>${h.code}${h.pct?' '+h.pct:''}</td><td>${H_MAP[h.code]||h.en}</td></tr>`).join('')}</table>`:''}
+      ${!signal&&!pics.size&&!hRows.length?'<div class="online-tip">该化合物暂无 GHS 分类数据</div>':''}`;
+  }catch(e){
+    box.innerHTML='<div class="online-tip">未获取到 GHS 安全数据（该化合物可能无供应商上报，或网络异常）</div>';
+  }
+}
+/* 在线开关 */
+$('#online-toggle').addEventListener('click',e=>{
+  state.online=!state.online;
+  e.currentTarget.classList.toggle('active',state.online);
+  if(!state.online){
+    if(pubchemCtl) pubchemCtl.abort();
+    $('#online-section').style.display='none';
+  }else if(state.kw){
+    pubchemSearch(state.kw);
+  }
+});
+
+/* ================= 爬虫实时查询 ================= */
+// API 地址跟随当前访问域名: 本机/局域网/公网隧道 自动适配
+const CRAWLER_API=(location.protocol.startsWith('http')?location.origin:'http://127.0.0.1:5000')+'/api';
+/* 危险品标志字母含义 */
+const SYM_MAP={F:'易燃',T:'有毒',Xn:'有害',N:'环境危害',C:'腐蚀性',Xi:'刺激性',O:'氧化性',E:'爆炸性','T+':'剧毒'};
+let crawlerCtl=null, crawlerTimer=null, crawlerAlive=null;
+
+/* 检测爬虫后端是否在线 */
+async function checkCrawler(silent){
+  const bar=$('#crawler-status');
+  try{
+    const r=await fetch(CRAWLER_API+'/ping',{signal:AbortSignal.timeout(3000)});
+    crawlerAlive=(await r.json()).ok===true;
+  }catch(e){crawlerAlive=false;}
+  if(state.crawler){
+    bar.classList.add('show');
+    bar.innerHTML=crawlerAlive
+      ?'<span class="status-dot on"></span>爬虫后端已连接 · 数据源 ChemicalBook 中文站'
+      :'<span class="status-dot off"></span>爬虫后端未启动 · 请在项目目录运行 <code style="color:var(--accent);background:rgba(52,224,200,.08);padding:1px 8px;border-radius:6px">python chemical_crawler.py</code>';
+  }else{
+    bar.classList.remove('show');
+  }
+  return crawlerAlive;
+}
+async function crawlerSearch(kw){
+  const sec=$('#crawler-section'), body=$('#crawler-body'), badge=$('#crawler-badge');
+  if(!kw||kw.length<1){sec.style.display='none';return;}
+  if(crawlerCtl) crawlerCtl.abort();
+  crawlerCtl=new AbortController();
+  const signal=crawlerCtl.signal;
+  sec.style.display='block';
+  badge.textContent='';
+  if(crawlerAlive===false){
+    await checkCrawler();
+    if(crawlerAlive===false){
+      body.innerHTML='<div class="online-tip">⚠ 爬虫后端未启动，无法实时抓取。请运行 <code>python chemical_crawler.py</code> 后重试。</div>';
+      return;
+    }
+  }
+  body.innerHTML='<div class="online-loading"><div class="spinner" style="border-color:rgba(52,224,200,.25);border-top-color:var(--accent)"></div>爬虫正在实时抓取 ChemicalBook 中文数据（目标站有风控，首次查询可能需重试几秒）…</div>';
+  try{
+    const r=await fetch(CRAWLER_API+'/search?q='+encodeURIComponent(kw),{signal});
+    if(!r.ok) throw r.status;
+    const d=await r.json();
+    if(d.error) throw d.error;
+    if(!d.items||!d.items.length){
+      body.innerHTML=`<div class="online-tip">爬虫未找到「${kw}」相关的 ChemicalBook 条目</div>`;
+      return;
+    }
+    badge.textContent='Top '+d.items.length+' · 实时抓取';
+    body.innerHTML='<div class="crawler-grid">'+d.items.map((it,i)=>`
+      <div class="crawler-card" data-cb="${it.cb}" style="animation-delay:${i*60}ms">
+        <span class="cc-cb">${it.cb}</span>
+        <div class="cc-top">
+          <div class="cc-icon">🧪</div>
+          <h4 title="${it.title||it.name}">${it.name}</h4>
+        </div>
+        ${it.cas?`<div class="cc-cas">CAS No. <b>${it.cas}</b></div>`:''}
+        <div class="cc-tip">点击查看完整化学性质与安全信息 →</div>
+      </div>`).join('')+'</div>';
+  }catch(e){
+    if(e.name==='AbortError') return;
+    await checkCrawler();
+    body.innerHTML=crawlerAlive===false
+      ?'<div class="online-tip">⚠ 爬虫后端已停止，请重新运行 <code>python chemical_crawler.py</code></div>'
+      :'<div class="online-tip">⚠ 目标站暂时触发了反爬风控，请稍等几秒后重试（后端会自动换标识重试）</div>';
+  }
+}
+/* 爬虫详情弹窗 */
+async function openCrawlerModal(cb){
+  modal.innerHTML='<div style="text-align:center;padding:56px 0"><div class="spinner" style="margin:0 auto 16px;border-color:rgba(52,224,200,.25);border-top-color:var(--accent)"></div><div style="color:var(--text-dim);font-size:13px">正在抓取 '+cb+' 详情页…</div></div>';
+  mask.classList.add('show');
+  document.body.style.overflow='hidden';
+  try{
+    const r=await fetch(CRAWLER_API+'/detail/'+cb);
+    if(!r.ok) throw r.status;
+    const d=await r.json();
+    if(d.error) throw d.error;
+    if(d.name && typeof bpNotifyChem==='function') bpNotifyChem(d.name);
+    if(d.banned){
+      modal.innerHTML=`
+        <div class="modal-head">
+          <div class="cat-icon" style="color:var(--warning);border-color:#ffb34755;background:#ffb34712">⚠️</div>
+          <div class="modal-title">
+            <h2>管控化学品</h2>
+            <div class="en">ChemicalBook · ${cb}</div>
+          </div>
+          <button class="modal-close" id="modal-close">✕</button>
+        </div>
+        <div class="desc-box safety" style="margin-top:18px">该化学品属于易制毒 / 易制爆等管控类别，数据源（ChemicalBook）依据法规未公开展示其详情页面。<br><br>💡 建议切换到上方 <b>PubChem 在线结果</b> 查看该化合物的国际公开数据；本地内置库中也收录了 54 种常用试剂的完整安全信息。</div>
+        <div style="text-align:center"><a class="src-link" href="${d.source}" target="_blank" rel="noopener">🔗 查看数据源提示页面 ↗</a></div>`;
+      $('#modal-close').onclick=closeModal;
+      return;
+    }
+    const propRows=Object.entries(d.props||{}).slice(0,14).map(([k,v])=>
+      `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+    const safeRows=Object.entries(d.safety||{}).map(([k,v])=>
+      `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+    const syms=(d.symbols||[]).map(s=>
+      `<span class="sym-tag">⚠ ${s}${SYM_MAP[s]?' · '+SYM_MAP[s]:''}</span>`).join(' ');
+    const aliasesCn=(d.aliases_cn||[]).filter(a=>a!==d.name).map(a=>`<span class="alias-chip">${a}</span>`).join('');
+    const aliasesEn=(d.aliases_en||[]).length?`<div class="en-alias">英文别名: ${(d.aliases_en||[]).join(' · ')}</div>`:'';
+    const risks=(d.risk_phrases||[]).map(p=>
+      `<div class="phrase-item"><span class="phrase-code">R${p.code}</span><span>${p.text}</span></div>`).join('');
+    const safes=(d.safety_phrases||[]).map(p=>
+      `<div class="phrase-item s"><span class="phrase-code">S${p.code}</span><span>${p.text}</span></div>`).join('');
+    const sections=(d.sections||[]).map(s=>
+      `<div class="sec-block"><h5>▎${s.title}</h5><p>${s.text}</p></div>`).join('');
+    modal.innerHTML=`
+      <div class="modal-head">
+        <div class="cat-icon" style="color:var(--accent);border-color:#34e0c855;background:#34e0c812">🕷️</div>
+        <div class="modal-title">
+          <h2>${d.name||cb}</h2>
+          <div class="en">${d.en_name?d.en_name+' · ':''}ChemicalBook 爬虫实时数据 · ${cb}</div>
+        </div>
+        <button class="modal-close" id="modal-close">✕</button>
+      </div>
+      ${d.hazmat?`<div style="text-align:center;margin-top:14px"><span class="hazmat-badge">⚠ 列入《危险化学品目录》</span></div>`:''}
+      ${d.formula?`<div class="modal-formula">${fmtFormula(d.formula)}</div>`:''}
+      ${aliasesCn?`<div class="alias-row">${aliasesCn}</div>`:''}
+      ${aliasesEn}
+      <div class="info-grid">
+        ${d.cas?`<div class="info-item"><div class="k">CAS 登录号</div><div class="v">${d.cas}</div></div>`:''}
+        ${d.mw?`<div class="info-item"><div class="k">分子量</div><div class="v">${d.mw} g/mol</div></div>`:''}
+        ${d.smiles?`<div class="info-item"><div class="k">SMILES</div><div class="v" style="font-family:Consolas,monospace;font-size:12.5px">${d.smiles}</div></div>`:''}
+        ${d.safety&&d.safety['危险品运输编号']?`<div class="info-item"><div class="k">UN 运输编号</div><div class="v" style="font-size:12.5px">${d.safety['危险品运输编号'].split('(')[0].trim()}</div></div>`:''}
+      </div>
+      ${syms?`<div class="section-title">⚠ 危险品标志</div><div style="display:flex;flex-wrap:wrap;gap:9px">${syms}</div>`:''}
+      ${d.desc_prop?`<div class="section-title">📝 化学性质</div><div class="desc-box">${d.desc_prop}</div>`:''}
+      ${d.desc_use?`<div class="section-title">🎯 主要用途</div><div class="desc-box">${d.desc_use}</div>`:''}
+      ${propRows?`<div class="section-title">🧪 理化性质（实时抓取）</div><table class="h-table">${propRows}</table>`:''}
+      ${risks?`<div class="section-title">☠ 风险术语（R 短语全文）</div><div class="phrase-list">${risks}</div>`:''}
+      ${safes?`<div class="section-title">🛡 安全说明（S 短语全文）</div><div class="phrase-list">${safes}</div>`:''}
+      ${safeRows?`<div class="section-title">📋 安全数据（实时抓取）</div><table class="h-table">${safeRows}</table>`:''}
+      ${sections?`<div class="section-title">📖 详细资料</div>${sections}`:''}
+      <div style="text-align:center;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <a class="src-link" href="${d.source}" target="_blank" rel="noopener">🔗 ChemicalBook 原文 ↗</a>
+        <a class="src-link" href="${d.msds}" target="_blank" rel="noopener">📄 MSDS 安全说明书 ↗</a>
+      </div>`;
+    $('#modal-close').onclick=closeModal;
+  }catch(e){
+    modal.innerHTML='<div style="text-align:center;padding:46px 0;color:var(--text-dim)">⚠ 抓取失败，目标站可能暂时无响应<br><br><button class="chip" id="modal-close">关闭</button></div>';
+    $('#modal-close').onclick=closeModal;
+  }
+}
+/* 爬虫开关 */
+$('#crawler-toggle').addEventListener('click',async e=>{
+  state.crawler=!state.crawler;
+  e.currentTarget.classList.toggle('active',state.crawler);
+  if(!state.crawler){
+    if(crawlerCtl) crawlerCtl.abort();
+    $('#crawler-section').style.display='none';
+    $('#crawler-status').classList.remove('show');
+  }else{
+    await checkCrawler();
+    if(state.kw) crawlerSearch(state.kw);
+  }
+});
+
+/* ================= 初始化 ================= */
+buildChips();
+render();
+checkCrawler();
+
+/* ================= Chemie 讲解小精灵 ================= */
+const bpPanel=$('#buddy-panel'), bpMsgs=$('#bp-msgs'), bpText=$('#bp-text'), bpSend=$('#bp-send'),
+      bpTip=$('#buddy-tip'), bpChips=$('#bp-chips'), buddyWrap=$('#buddy-wrap'), buddy=$('#buddy');
+let bpHistory=[], bpBusy=false, bpTipTimer=null;
+window.currentChem='';   // 当前正在查看的化合物名, 作为聊天上下文
+
+/* ---------- 拖拽移动(带位置记忆) ---------- */
+const BUDDY_POS_KEY='chemie_pos';
+let dragState=null, suppressClick=false;
+function buddySetPos(x,y){
+  const w=buddyWrap.offsetWidth, h=buddyWrap.offsetHeight;
+  x=Math.max(4,Math.min(x,innerWidth-w-4));
+  y=Math.max(4,Math.min(y,innerHeight-h-4));
+  buddyWrap.style.left=x+'px'; buddyWrap.style.top=y+'px';
+  buddyWrap.style.right='auto'; buddyWrap.style.bottom='auto';
+}
+try{  // 恢复上次位置
+  const p=JSON.parse(localStorage.getItem(BUDDY_POS_KEY)||'null');
+  if(p&&typeof p.x==='number') buddySetPos(p.x,p.y);
+}catch(e){}
+buddy.addEventListener('pointerdown',e=>{
+  dragState={x0:e.clientX,y0:e.clientY,moved:false};
+  buddy.setPointerCapture(e.pointerId);
+});
+buddy.addEventListener('pointermove',e=>{
+  if(!dragState) return;
+  const dx=e.clientX-dragState.x0, dy=e.clientY-dragState.y0;
+  if(!dragState.moved && Math.hypot(dx,dy)>6){
+    dragState.moved=true; buddy.classList.add('dragging');
+  }
+  if(dragState.moved){
+    const r=buddyWrap.getBoundingClientRect();
+    buddySetPos(r.left+dx, r.top+dy);
+    dragState.x0=e.clientX; dragState.y0=e.clientY;
+    if(bpPanel.classList.contains('open')) bpPositionPanel();
+  }
+});
+buddy.addEventListener('pointerup',()=>{
+  if(dragState&&dragState.moved){
+    const r=buddyWrap.getBoundingClientRect();
+    localStorage.setItem(BUDDY_POS_KEY,JSON.stringify({x:r.left,y:r.top}));
+    suppressClick=true;   // 刚拖拽完不触发"点击展开面板"
+  }
+  buddy.classList.remove('dragging');
+  dragState=null;
+});
+window.addEventListener('resize',()=>{
+  const r=buddyWrap.getBoundingClientRect();
+  buddySetPos(r.left,r.top);   // 视口变化时防止跑出屏幕
+  if(bpPanel.classList.contains('open')) bpPositionPanel();
+});
+
+/* ---------- 面板/气泡智能定位(不超出屏幕) ---------- */
+function bpPositionPanel(){
+  const r=buddyWrap.getBoundingClientRect();
+  const pw=Math.min(340,innerWidth-40), ph=Math.min(460,innerHeight-20), gap=12;
+  let left=r.right-pw;                                  // 默认与小精灵右对齐
+  if(left<8) left=r.left;                               // 太靠左则左对齐
+  left=Math.max(8,Math.min(left,innerWidth-pw-8));
+  let top=r.top-ph-gap;                                 // 默认在小精灵上方
+  if(top<8) top=r.bottom+gap;                           // 上方不够则放下方
+  top=Math.max(8,Math.min(top,innerHeight-ph-8));
+  bpPanel.style.left=left+'px'; bpPanel.style.top=top+'px';
+}
+function bpShowTip(text, hold=4000){
+  bpTip.textContent=text;
+  bpTip.classList.add('show');
+  const r=buddyWrap.getBoundingClientRect();
+  const tw=bpTip.offsetWidth, th=bpTip.offsetHeight;
+  bpTip.style.left=Math.max(8,Math.min(r.right-tw,innerWidth-tw-8))+'px';
+  bpTip.style.top=Math.max(8,r.top-th-10)+'px';
+  clearTimeout(bpTipTimer);
+  bpTipTimer=setTimeout(()=>bpTip.classList.remove('show'), hold);
+}
+function bpAddMsg(role, text){
+  const d=document.createElement('div');
+  d.className='bp-msg '+(role==='user'?'me':'ai');
+  d.textContent=text;
+  bpMsgs.appendChild(d);
+  bpMsgs.scrollTop=bpMsgs.scrollHeight;
+  return d;
+}
+function bpRenderChips(){
+  const chips=[];
+  if(window.currentChem) chips.push('🔍 讲讲「'+window.currentChem+'」');
+  chips.push('🧪 CAS 号是什么？','🛡 实验室安全 3 条铁律','⚗️ 酸碱中和是什么？');
+  bpChips.innerHTML=chips.map(c=>`<span class="bp-chip">${c}</span>`).join('');
+  bpChips.querySelectorAll('.bp-chip').forEach(el=>{
+    el.onclick=()=>{
+      let q=el.textContent.replace(/^[^\s]+\s/,'');
+      if(q.startsWith('讲讲')) q=`请用简单有趣的方式讲解一下${window.currentChem}：它是什么、有什么特点、要注意什么安全事项`;
+      bpText.value=q;
+      bpSendMsg();
+    };
+  });
+}
+async function bpSendMsg(){
+  const q=bpText.value.trim();
+  if(!q||bpBusy) return;
+  bpBusy=true; bpSend.disabled=true; bpText.value='';
+  bpAddMsg('user', q);
+  bpHistory.push({role:'user',content:q});
+  const typing=bpAddMsg('ai','');
+  typing.classList.add('typing'); typing.innerHTML='<i></i><i></i><i></i>';
+  try{
+    const r=await fetch(CRAWLER_API.replace(/\/api$/,'')+'/api/chat',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:bpHistory,context:window.currentChem})
+    });
+    const d=await r.json();
+    typing.remove();
+    if(d.reply){
+      bpAddMsg('ai', d.reply);
+      bpHistory.push({role:'assistant',content:d.reply});
+    }else if(d.error==='no_brain'){
+      bpAddMsg('ai','🧠 我的大脑还没接上哦！请主人在 d:\\trae 下新建 deepseek_key.txt 填入 DeepSeek API key 并重启后端，或安装 Ollama 本地模型（免费）～');
+    }else if(d.error==='rate_limited'){
+      bpAddMsg('ai','⏳ 聊得太快啦！每分钟最多 10 条，喝口水休息一下再来找我吧～');
+    }else{
+      bpAddMsg('ai','😵 出了点小状况：'+(d.error||'未知错误')+'，稍后再找我吧～');
+    }
+  }catch(e){
+    typing.remove();
+    bpAddMsg('ai','📡 联系不上后端啦，请确认 chemical_crawler.py 正在运行～');
+  }
+  bpBusy=false; bpSend.disabled=false; bpText.focus();
+}
+// 开关面板
+$('#buddy').addEventListener('click',()=>{
+  if(suppressClick){ suppressClick=false; return; }   // 拖拽结束不视为点击
+  const open=bpPanel.classList.toggle('open');
+  if(open) bpPositionPanel();
+  if(open && !bpMsgs.children.length){
+    bpAddMsg('ai','嗨～我是 Chemie 🧪，住在这只烧瓶里的化学小精灵！\n可以问我任何化学问题，比如"乙醇为什么易燃？"\n你正在查看化合物时，我还能结合它讲解哦～\n\n（偷偷告诉你：我可以被拖到屏幕任何地方哦～）');
+  }
+  if(open){ bpRenderChips(); bpText.focus(); }
+});
+bpSend.addEventListener('click',bpSendMsg);
+bpText.addEventListener('keydown',e=>{ if(e.key==='Enter') bpSendMsg(); });
+// 首次打招呼 + 查看化合物时冒泡提示
+setTimeout(()=>{ if(!bpPanel.classList.contains('open')) bpShowTip('嗨～我是 Chemie 🧪 点我聊天吧！',5000); },2500);
+function bpNotifyChem(name){
+  window.currentChem=name||'';
+  bpRenderChips();
+  if(!bpPanel.classList.contains('open') && name)
+    bpShowTip('想了解「'+name+'」？点我讲解 ✨',4500);
+}
+</script>
+</body>
+</html>

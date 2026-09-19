@@ -29,6 +29,27 @@ STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
 # 聊天限流: 公网分享时防止余额被刷, 每 IP 每分钟 10 次
 RATE = {}
 
+# 每日聊天总量限制(防超支): 默认每天 100 次, 通过环境变量 DAILY_CHAT_LIMIT 可调
+DAILY_CHAT_LIMIT = int(os.environ.get('DAILY_CHAT_LIMIT', '100'))
+_DAILY_COUNT = {}  # {'2026-09-19': 42}
+
+
+def daily_remaining():
+    """返回当日剩余聊天次数"""
+    key = time.strftime('%Y-%m-%d')
+    used = _DAILY_COUNT.get(key, 0)
+    return max(0, DAILY_CHAT_LIMIT - used)
+
+
+def daily_incr():
+    """增加当日聊天计数, 返回 True=未超限, False=额度用完"""
+    key = time.strftime('%Y-%m-%d')
+    used = _DAILY_COUNT.get(key, 0)
+    if used >= DAILY_CHAT_LIMIT:
+        return False
+    _DAILY_COUNT[key] = used + 1
+    return True
+
 
 def rate_ok(ip, limit=10, window=60):
     now = time.time()
@@ -460,7 +481,7 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         try:
             if u.path == '/api/ping':
-                return self._json({'ok': True})
+                return self._json({'ok': True, 'remaining': daily_remaining()})
 
             if u.path == '/api/search':
                 q = parse_qs(u.query).get('q', [''])[0].strip()
@@ -511,7 +532,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == '/api/chat':
                 if not rate_ok(self.client_address[0]):
-                    return self._json({'error': 'rate_limited'})
+                    return self._json({'error': 'rate_limited', 'remaining': daily_remaining()})
+                rem = daily_remaining()
+                if rem <= 0:
+                    return self._json({'error': 'daily_limit', 'reply': '今日聊天额度已用完，明天再来找我吧～ 🧪',
+                                       'remaining': 0})
                 n = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(n) or b'{}')
                 msgs = body.get('messages') or []
@@ -520,9 +545,10 @@ class Handler(BaseHTTPRequestHandler):
                 msgs = [{'role': m.get('role'), 'content': str(m.get('content', ''))[:800]}
                         for m in msgs if m.get('role') in ('user', 'assistant')][-12:]
                 if not msgs:
-                    return self._json({'error': '空消息'}, 400)
+                    return self._json({'error': '空消息', 'remaining': rem}, 400)
+                daily_incr()
                 reply = chat_reply(msgs, ctx)
-                return self._json({'reply': reply})
+                return self._json({'reply': reply, 'remaining': daily_remaining()})
             self._json({'error': 'not found'}, 404)
         except requests.exceptions.ConnectionError:
             # 无 DeepSeek key 且本地 Ollama 也不可用

@@ -351,6 +351,8 @@ body{
 .bp-head{display:flex;align-items:center;gap:9px;padding:13px 16px;background:rgba(52,224,200,.08);border-bottom:1px solid rgba(52,224,200,.18);font-weight:800;font-size:14px;color:#eaf2ff}
 .bp-head .bp-dot{width:8px;height:8px;border-radius:50%;background:var(--safe);box-shadow:0 0 8px var(--safe)}
 .bp-head .bp-sub{font-size:10.5px;font-weight:400;color:var(--text-dim);margin-left:auto}
+.bp-close{border:none;background:none;color:var(--text-dim);font-size:16px;cursor:pointer;padding:2px 6px;border-radius:6px;line-height:1;transition:.2s;flex:none;margin-left:4px}
+.bp-close:hover{background:rgba(255,84,112,.2);color:var(--danger)}
 .bp-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
 .bp-msg{max-width:84%;padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;animation:msg-in .3s}
 @keyframes msg-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -478,6 +480,7 @@ body{
     <div class="bp-head">
       <span class="bp-dot"></span>Chemie 化学小精灵
       <span class="bp-sub">DeepSeek 驱动</span>
+      <button class="bp-close" id="bp-close" title="关闭">✕</button>
     </div>
     <div class="bp-msgs" id="bp-msgs"></div>
     <div class="bp-chips" id="bp-chips"></div>
@@ -1349,15 +1352,30 @@ async function bpSendMsg(){
   }
   bpBusy=false; bpSend.disabled=false; bpText.focus();
 }
-// 开关面板
-$('#buddy').addEventListener('click',()=>{
-  if(suppressClick){ suppressClick=false; return; }   // 拖拽结束不视为点击
-  const open=bpPanel.classList.toggle('open');
-  if(open) bpPositionPanel();
-  if(open && !bpMsgs.children.length){
+// 打开面板
+function bpOpen(){
+  if(bpPanel.classList.contains('open')) return;
+  bpPanel.classList.add('open');
+  bpPositionPanel();
+  if(!bpMsgs.children.length){
     bpAddMsg('ai','嗨～我是 Chemie 🧪，住在这只烧瓶里的化学小精灵！\n可以问我任何化学问题，比如"乙醇为什么易燃？"\n你正在查看化合物时，我还能结合它讲解哦～\n\n（偷偷告诉你：我可以被拖到屏幕任何地方哦～）');
   }
-  if(open){ bpRenderChips(); bpText.focus(); }
+  bpRenderChips(); bpText.focus();
+}
+function bpClose(){
+  bpPanel.classList.remove('open');
+}
+// 点小精灵只打开
+$('#buddy').addEventListener('click',()=>{
+  if(suppressClick){ suppressClick=false; return; }   // 拖拽结束不视为点击
+  bpOpen();
+});
+// X 关闭
+$('#bp-close').addEventListener('click',(e)=>{ e.stopPropagation(); bpClose(); });
+// 点击面板外部关闭(面板内的点击不冒泡到文档)
+document.addEventListener('click',(e)=>{
+  if(bpPanel.classList.contains('open') && !buddyWrap.contains(e.target))
+    bpClose();
 });
 bpSend.addEventListener('click',bpSendMsg);
 bpText.addEventListener('keydown',e=>{ if(e.key==='Enter') bpSendMsg(); });
